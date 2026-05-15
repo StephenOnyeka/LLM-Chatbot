@@ -1,0 +1,32 @@
+export type ChatRole = "user" | "assistant";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface Session {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Message {
+  id: string;
+  sessionId: string;
+  role: ChatRole;
+  content: string;
+  createdAt: string;
+  pending?: boolean;
+}
+
+export interface Credentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterPayload extends Credentials {
+  name: string;
+}
