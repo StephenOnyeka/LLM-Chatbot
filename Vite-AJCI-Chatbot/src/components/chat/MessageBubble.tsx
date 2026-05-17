@@ -1,4 +1,6 @@
 import { Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "../../lib/cn";
 import type { Message } from "../../lib/types";
 
@@ -29,8 +31,16 @@ export function MessageBubble({ message }: Props) {
         <div className="mb-1 text-xs font-medium text-[var(--color-text-muted)]">
           {isUser ? "You" : "Assistant"}
         </div>
-        <div className="whitespace-pre-wrap text-sm leading-6 text-[var(--color-text)]">
-          {message.content}
+        <div className="text-sm leading-6 text-[var(--color-text)]">
+          {isUser ? (
+            <div className="whitespace-pre-wrap">{message.content}</div>
+          ) : (
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
           {message.pending && (
             <span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-[var(--color-text-muted)]" />
           )}
