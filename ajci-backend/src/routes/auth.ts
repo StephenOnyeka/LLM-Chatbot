@@ -1,14 +1,23 @@
 import { Router } from "express";
 import { z } from "zod";
+import { env } from "../config.js";
 import { clearAuthCookie, setAuthCookie } from "../lib/cookies.js";
 import { signToken } from "../lib/jwt.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { HttpError } from "../middleware/error.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { createUser, findUserByEmail } from "../repos/users.js";
 
 const router = Router();
+
+// Shared "auth" bucket so an attacker can't double their budget by alternating
+// login and register endpoints.
+const authLimiter = rateLimit({
+  bucket: "auth",
+  limit: env.RATE_LIMIT_AUTH_PER_MINUTE,
+});
 
 const RegisterBody = z.object({
   email: z.string().email().max(254),
@@ -23,6 +32,7 @@ const LoginBody = z.object({
 
 router.post(
   "/register",
+  authLimiter,
   asyncHandler(async (req, res) => {
     const body = RegisterBody.parse(req.body);
     const existing = await findUserByEmail(body.email);
@@ -38,6 +48,7 @@ router.post(
 
 router.post(
   "/login",
+  authLimiter,
   asyncHandler(async (req, res) => {
     const body = LoginBody.parse(req.body);
     const found = await findUserByEmail(body.email);

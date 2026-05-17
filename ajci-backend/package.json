@@ -8,16 +8,20 @@
     "build": "tsc -p .",
     "start": "node dist/index.js",
     "typecheck": "tsc -p . --noEmit",
-    "db:init": "psql \"$DATABASE_URL\" -f sql/001_init.sql"
+    "db:init": "psql \"$DATABASE_URL\" -f sql/001_init.sql",
+    "worker": "tsx watch src/workers/aiWorker.ts",
+    "worker:start": "node dist/workers/aiWorker.js"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.76.9",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "helmet": "^8.0.0",
+    "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pg": "^8.13.1",

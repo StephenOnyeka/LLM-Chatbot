@@ -5,6 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env, isProd } from "./config.js";
 import { errorHandler, notFound } from "./middleware/error.js";
+import { rateLimit } from "./middleware/rateLimit.js";
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
 import sessionsRoutes from "./routes/sessions.js";
@@ -29,6 +30,12 @@ export function createApp() {
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
   });
+
+  // Global safety-net limiter; per-route limiters below are tighter.
+  app.use(
+    "/api",
+    rateLimit({ bucket: "global", limit: env.RATE_LIMIT_PER_MINUTE }),
+  );
 
   app.use("/api/auth", authRoutes);
   app.use("/api/sessions", sessionsRoutes);
