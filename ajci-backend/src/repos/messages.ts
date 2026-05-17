@@ -45,15 +45,26 @@ export async function append(
   return toMessage(rows[0]!);
 }
 
-export async function listAsGeminiHistory(conversationId: string): Promise<GeminiTurn[]> {
+// Default sliding-window size for Gemini context. Every turn beyond this is
+// kept in Postgres (and still rendered in the UI) but not sent to the model,
+// so token cost per turn stays bounded as a conversation grows.
+export const GEMINI_HISTORY_LIMIT = 20;
+
+export async function listAsGeminiHistory(
+  conversationId: string,
+  limit: number = GEMINI_HISTORY_LIMIT,
+): Promise<GeminiTurn[]> {
+  // Grab the most recent N rows (newest-first), then reverse to oldest-first
+  // because Gemini expects chronological order.
   const { rows } = await query<{ role: ChatRole; content: string }>(
     `select role, content
      from messages
      where conversation_id = $1
-     order by created_at asc`,
-    [conversationId],
+     order by created_at desc
+     limit $2`,
+    [conversationId, limit],
   );
-  return rows.map((r) => ({
+  return rows.reverse().map((r) => ({
     role: r.role === "assistant" ? "model" : "user",
     parts: [{ text: r.content }],
   }));
