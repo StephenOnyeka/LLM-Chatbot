@@ -8,7 +8,17 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
   JWT_EXPIRES_IN: z.string().default("7d"),
   COOKIE_DOMAIN: z.string().optional().transform((v) => (v && v.length > 0 ? v : undefined)),
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  // When the frontend is on a different origin than the API (e.g. Vercel + Render),
+  // the auth cookie must be SameSite=None; Secure or the browser drops it.
+  COOKIE_CROSS_SITE: z
+    .string()
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
+  // Comma-separated list of allowed origins (e.g. "http://localhost:5173,https://app.vercel.app").
+  CORS_ORIGIN: z
+    .string()
+    .default("http://localhost:5173")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
