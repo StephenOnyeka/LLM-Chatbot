@@ -11,7 +11,7 @@ async function* streamChat(
   sessionId: string,
   content: string,
 ): AsyncIterable<string> {
-  const base = import.meta.env.VITE_API_BASE ?? "/api";
+  const base = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/+$/, "");
   const res = await fetch(`${base}/sessions/${sessionId}/chat`, {
     method: "POST",
     credentials: "include",

@@ -7,7 +7,9 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = import.meta.env.VITE_API_BASE ?? "/api";
+// Strip any trailing slash so `${BASE}${path}` can't produce a double slash
+// (e.g. a misconfigured "https://host/" + "/auth/login" → "https://host//auth/login").
+const BASE = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/+$/, "");
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
