@@ -10,7 +10,13 @@ export async function requireAuth(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token = req.cookies?.[COOKIE_NAME];
+    // Prefer the Authorization: Bearer header (works cross-site on every
+    // browser, since it doesn't depend on third-party cookies). Fall back to
+    // the cookie for same-site requests and local development.
+    const header = req.headers.authorization;
+    const bearer =
+      header && header.startsWith("Bearer ") ? header.slice(7).trim() : undefined;
+    const token = bearer || req.cookies?.[COOKIE_NAME];
     if (!token) throw new HttpError(401, "Not authenticated");
     const { sub } = verifyToken(token);
     const user = await findUserById(sub);

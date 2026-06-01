@@ -41,8 +41,11 @@ router.post(
     const passwordHash = await hashPassword(body.password);
     const user = await createUser(body.email, body.name, passwordHash);
 
-    setAuthCookie(res, signToken(user.id));
-    res.status(201).json(user);
+    const token = signToken(user.id);
+    setAuthCookie(res, token);
+    // Also return the token so cross-site clients (where third-party cookies
+    // are blocked) can send it as an Authorization: Bearer header.
+    res.status(201).json({ ...user, token });
   }),
 );
 
@@ -58,8 +61,9 @@ router.post(
     if (!ok) throw new HttpError(401, "Invalid email or password");
 
     const user = { id: found.id, email: found.email, name: found.name };
-    setAuthCookie(res, signToken(user.id));
-    res.json(user);
+    const token = signToken(user.id);
+    setAuthCookie(res, token);
+    res.json({ ...user, token });
   }),
 );
 

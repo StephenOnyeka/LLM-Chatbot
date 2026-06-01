@@ -1,5 +1,6 @@
-import { ApiError, request } from "./client";
+import { ApiError, authHeaders, clearToken, request, setToken } from "./client";
 import type {
+  AuthResponse,
   Credentials,
   Message,
   RegisterPayload,
@@ -15,7 +16,7 @@ async function* streamChat(
   const res = await fetch(`${base}/sessions/${sessionId}/chat`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ content }),
   });
 
@@ -75,11 +76,31 @@ async function* streamChat(
 
 export const api = {
   auth: {
-    login: (creds: Credentials) =>
-      request<User>("/auth/login", { method: "POST", body: JSON.stringify(creds) }),
-    register: (payload: RegisterPayload) =>
-      request<User>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
-    logout: () => request<void>("/auth/logout", { method: "POST" }),
+    login: async (creds: Credentials): Promise<User> => {
+      const { token, ...user } = await request<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(creds),
+      });
+      setToken(token);
+      return user;
+    },
+    register: async (payload: RegisterPayload): Promise<User> => {
+      const { token, ...user } = await request<AuthResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setToken(token);
+      return user;
+    },
+    logout: async (): Promise<void> => {
+      try {
+        await request<void>("/auth/logout", { method: "POST" });
+      } finally {
+        // Clear the local token even if the network call fails, so the user
+        // is logged out client-side regardless.
+        clearToken();
+      }
+    },
     me: () => request<User>("/auth/me"),
   },
   sessions: {

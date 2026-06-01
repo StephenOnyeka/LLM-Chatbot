@@ -6,6 +6,12 @@ export interface User {
   name: string;
 }
 
+// Login/register return the user plus a JWT for Authorization: Bearer auth
+// (used when third-party cookies are blocked cross-site).
+export interface AuthResponse extends User {
+  token: string;
+}
+
 export interface Session {
   id: string;
   title: string;
