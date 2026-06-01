@@ -15,13 +15,25 @@ const schema = z.object({
     .optional()
     .transform((v) => v === "true" || v === "1"),
   // Comma-separated list of allowed origins (e.g. "http://localhost:5173,https://app.vercel.app").
+  // Trailing slashes are stripped and duplicates removed so values like
+  // "https://app.vercel.app/" still match the browser's Origin header.
   CORS_ORIGIN: z
     .string()
-    .default("http://localhost:5173")
-    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
+    .default("http://localhost:5173,https://ajci-chatbot.vercel.app")
+    .transform((v) =>
+      Array.from(
+        new Set(
+          v
+            .split(",")
+            .map((s) => s.trim().replace(/\/+$/, ""))
+            .filter(Boolean),
+        ),
+      ),
+    ),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
-  REDIS_URL: z.string().url().default("redis://localhost:6379"),
+  // REDIS_URL: z.string().url().default("redis://localhost:6379"),
+  REDIS_URL: z.string().url().default("redis://default:4UBAIHKcP5n0crPCYJM8ygOmPiGhpvZA@candied-likely-idea-98521.db.redis.io:10222"),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_CHAT_PER_MINUTE: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_AUTH_PER_MINUTE: z.coerce.number().int().positive().default(10),

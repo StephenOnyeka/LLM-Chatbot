@@ -19,7 +19,19 @@ export function createApp() {
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
+      // Normalize the incoming Origin (strip trailing slash) before matching
+      // against the allowlist, and log rejects so misconfigured origins are
+      // visible in the deploy logs instead of failing silently.
+      origin(origin, cb) {
+        // Allow requests with no Origin header (curl, server-to-server, same-origin).
+        if (!origin) return cb(null, true);
+        const normalized = origin.replace(/\/+$/, "");
+        if (env.CORS_ORIGIN.includes(normalized)) return cb(null, true);
+        console.warn(
+          `CORS rejected origin "${origin}"; allowed: ${env.CORS_ORIGIN.join(", ")}`,
+        );
+        return cb(null, false);
+      },
       credentials: true,
     }),
   );
