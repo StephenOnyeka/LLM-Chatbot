@@ -3,6 +3,8 @@ import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
 import { useAuth, useLogout } from "../../hooks/useAuth";
 import { useCreateSession, useDeleteSession, useSessions } from "../../hooks/useSessions";
+import { useUIStore } from "../../store/uiStore";
+import { cn } from "../../lib/cn";
 import { SessionItem } from "./SessionItem";
 
 export function Sidebar() {
@@ -11,9 +13,19 @@ export function Sidebar() {
   const createSession = useCreateSession();
   const deleteSession = useDeleteSession();
   const logout = useLogout();
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const setSidebar = useUIStore((s) => s.setSidebar);
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
+    <aside
+      className={cn(
+        // Mobile: fixed slide-in drawer driven by `sidebarOpen`.
+        "fixed inset-y-0 left-0 z-40 flex h-full w-72 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] transition-transform duration-200",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        // md+: revert to a static in-flow column, always visible.
+        "md:static md:translate-x-0",
+      )}
+    >
       <div className="flex items-center gap-2 px-4 py-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
           <MessageSquareText className="h-4 w-4" />
@@ -25,7 +37,10 @@ export function Sidebar() {
         <Button
           variant="primary"
           className="w-full"
-          onClick={() => createSession.mutate()}
+          onClick={() => {
+            createSession.mutate();
+            setSidebar(false);
+          }}
           disabled={createSession.isPending}
         >
           <Plus className="h-4 w-4" />

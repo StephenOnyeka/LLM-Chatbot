@@ -8,9 +8,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        // target: 'http://localhost:4000',
+        target: 'http://localhost:4000',
         // target: 'https://ajci-backend.vercel.app/',
-        target: 'https://ajci-backend.onrender.com/',
+        // target: 'https://ajci-backend.onrender.com/',
         changeOrigin: false,
       },
     },

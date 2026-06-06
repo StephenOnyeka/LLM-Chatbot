@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
+import { useUIStore } from "../../store/uiStore";
 import type { Session } from "../../lib/types";
 
 interface Props {
@@ -9,9 +10,11 @@ interface Props {
 }
 
 export function SessionItem({ session, onDelete }: Props) {
+  const setSidebar = useUIStore((s) => s.setSidebar);
   return (
     <NavLink
       to={`/chat/${session.id}`}
+      onClick={() => setSidebar(false)}
       className={({ isActive }) =>
         cn(
           "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition",
@@ -29,7 +32,7 @@ export function SessionItem({ session, onDelete }: Props) {
           e.stopPropagation();
           onDelete(session.id);
         }}
-        className="opacity-0 transition group-hover:opacity-100 hover:text-[var(--color-danger)]"
+        className="opacity-100 transition hover:text-[var(--color-danger)] md:opacity-0 md:group-hover:opacity-100"
         aria-label={`Delete ${session.title}`}
       >
         <Trash2 className="h-4 w-4" />
