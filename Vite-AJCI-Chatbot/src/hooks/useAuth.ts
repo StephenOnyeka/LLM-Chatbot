@@ -1,9 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type NavigateFunction, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import type { Credentials, RegisterPayload, User } from "../lib/types";
+import type { Credentials, RegisterPayload, Session, User } from "../lib/types";
 
 const ME_KEY = ["auth", "me"] as const;
+
+// After auth, drop the user straight into a fresh chat so they can type right
+// away. If creating the session fails, fall back to /chat so login never
+// dead-ends.
+async function enterFreshChat(qc: QueryClient, navigate: NavigateFunction): Promise<void> {
+  try {
+    const session = await api.sessions.create();
+    qc.setQueryData<Session[]>(["sessions"], (prev) => [session, ...(prev ?? [])]);
+    navigate(`/chat/${session.id}`, { replace: true });
+  } catch {
+    navigate("/chat", { replace: true });
+  }
+}
 
 export function useAuth() {
   return useQuery<User | null>({
@@ -25,9 +38,9 @@ export function useLogin() {
   const navigate = useNavigate();
   return useMutation({
     mutationFn: (creds: Credentials) => api.auth.login(creds),
-    onSuccess: (user) => {
+    onSuccess: async (user) => {
       qc.setQueryData(ME_KEY, user);
-      navigate("/chat", { replace: true });
+      await enterFreshChat(qc, navigate);
     },
   });
 }
@@ -37,9 +50,9 @@ export function useRegister() {
   const navigate = useNavigate();
   return useMutation({
     mutationFn: (payload: RegisterPayload) => api.auth.register(payload),
-    onSuccess: (user) => {
+    onSuccess: async (user) => {
       qc.setQueryData(ME_KEY, user);
-      navigate("/chat", { replace: true });
+      await enterFreshChat(qc, navigate);
     },
   });
 }
