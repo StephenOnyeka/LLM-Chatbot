@@ -13,8 +13,9 @@ export function MessageBubble({ message }: Props) {
   return (
     <div
       className={cn(
-        "flex gap-3 px-6 py-4",
-        isUser ? "bg-transparent" : "bg-[var(--color-surface)]/40",
+        "flex gap-3 px-4 py-4 sm:px-6",
+        // User messages sit on the right, the assistant on the left.
+        isUser ? "flex-row-reverse" : "flex-row",
       )}
     >
       <div
@@ -27,11 +28,19 @@ export function MessageBubble({ message }: Props) {
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
-      <div className="flex-1 pt-1">
+      <div className={cn("flex min-w-0 max-w-[90%] flex-col", isUser ? "items-end" : "items-start")}>
         <div className="mb-1 text-xs font-medium text-[var(--color-text-muted)]">
           {isUser ? "You" : "Assistant"}
         </div>
-        <div className="text-sm leading-6 text-[var(--color-text)]">
+        <div
+          className={cn(
+            "rounded-2xl px-4 py-2.5 text-sm leading-6 text-[var(--color-text)]",
+            isUser
+              ? "rounded-tr-sm bg-[var(--color-accent)]/15"
+              // : "rounded-tl-sm bg-[var(--color-surface)]/60",
+              : "rounded-tl-sm bg-[var(--color-surface)]/0",
+          )}
+        >
           {isUser ? (
             <div className="whitespace-pre-wrap">{message.content}</div>
           ) : (
