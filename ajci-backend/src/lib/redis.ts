@@ -35,6 +35,14 @@ export function getRedis(): Redis {
   client = new Redis(env.REDIS_URL, {
     lazyConnect: false,
     enableOfflineQueue: true,
+    // Fail fast so cache misses and the rate limiter degrade to the DB quickly
+    // when Redis is unreachable. Without these, a command sits in the offline
+    // queue retrying (default 20×) and the awaiting request hangs ~20s before
+    // erroring instead of falling through the cache try/catch. maxRetries
+    // bounds the disconnected case; commandTimeout bounds a connected-but-stalled
+    // one. (BullMQ uses its own connection in bullmqConnectionOptions below.)
+    maxRetriesPerRequest: 1,
+    commandTimeout: 1000,
   });
   client.on("error", (err: Error) => logErrorThrottled("Redis client error", err));
   client.on("connect", () => console.log("✓ Redis connected"));

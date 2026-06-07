@@ -5,9 +5,16 @@ import { getRedis } from "./redis.js";
 export const RESPONSE_CACHE_TTL_SEC = 86_400; // 24h
 
 // Pin the canonical form so future additions to GeminiTurn (tool calls etc.)
-// don't accidentally change every existing key.
-export function hashPromptKey(model: string, history: GeminiTurn[]): string {
+// don't accidentally change every existing key. The userId is part of the hash
+// so two users can never share a cache entry, even with identical history —
+// without it, one user's reply could be replayed to another.
+export function hashPromptKey(
+  userId: string,
+  model: string,
+  history: GeminiTurn[],
+): string {
   const canonical = JSON.stringify({
+    userId,
     model,
     history: history.map((t) => ({
       role: t.role,

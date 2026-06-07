@@ -1,5 +1,10 @@
 import { query } from "../db.js";
+import { getRedis } from "../lib/redis.js";
 import type { Session } from "../types.js";
+
+// Mirror of the history cache key in repos/messages.ts. Deleting a conversation
+// cascades to its messages in PG, so the cached history must be dropped too.
+const historyCacheKey = (conversationId: string) => `chat:history:${conversationId}`;
 
 interface Row {
   id: string;
@@ -43,7 +48,15 @@ export async function deleteOwned(id: string, userId: string): Promise<boolean> 
     `delete from conversations where id = $1 and user_id = $2`,
     [id, userId],
   );
-  return (rowCount ?? 0) > 0;
+  const deleted = (rowCount ?? 0) > 0;
+  if (deleted) {
+    try {
+      await getRedis().del(historyCacheKey(id));
+    } catch {
+      // best-effort — a stale key still expires via TTL
+    }
+  }
+  return deleted;
 }
 
 export async function getOwned(id: string, userId: string): Promise<Session | null> {

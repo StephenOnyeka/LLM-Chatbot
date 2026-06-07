@@ -1,5 +1,6 @@
 import { query } from "../db.js";
 import type { GeminiTurn } from "../lib/gemini.js";
+import { getRedis } from "../lib/redis.js";
 import type { ChatRole, Message } from "../types.js";
 
 interface Row {
@@ -20,7 +21,33 @@ function toMessage(r: Row): Message {
   };
 }
 
-export async function listForConversation(conversationId: string): Promise<Message[]> {
+// A conversation's full message list is read both by the /messages endpoint and
+// (sliced) on every chat turn, so it's cached in Redis as the single source of
+// truth. createdAt is already an ISO string, so JSON round-trips losslessly.
+// Any write to the conversation must invalidate this key (see append +
+// deleteOwned). All Redis calls fail open to the DB.
+const HISTORY_CACHE_TTL_SEC = 1800; // 30 min
+const historyCacheKey = (conversationId: string) => `chat:history:${conversationId}`;
+
+async function invalidateHistory(conversationId: string): Promise<void> {
+  try {
+    await getRedis().del(historyCacheKey(conversationId));
+  } catch {
+    // best-effort — a stale key still expires via TTL
+  }
+}
+
+// Cache-aside read of the full oldest-first message list for a conversation.
+async function getCachedMessages(conversationId: string): Promise<Message[]> {
+  const key = historyCacheKey(conversationId);
+
+  try {
+    const cached = await getRedis().get(key);
+    if (cached) return JSON.parse(cached) as Message[];
+  } catch {
+    // cache read failed — fall through to the DB
+  }
+
   const { rows } = await query<Row>(
     `select id, conversation_id, role, content, created_at
      from messages
@@ -28,7 +55,19 @@ export async function listForConversation(conversationId: string): Promise<Messa
      order by created_at asc`,
     [conversationId],
   );
-  return rows.map(toMessage);
+  const messages = rows.map(toMessage);
+
+  try {
+    await getRedis().set(key, JSON.stringify(messages), "EX", HISTORY_CACHE_TTL_SEC);
+  } catch {
+    // cache write is best-effort
+  }
+
+  return messages;
+}
+
+export async function listForConversation(conversationId: string): Promise<Message[]> {
+  return getCachedMessages(conversationId);
 }
 
 export async function append(
@@ -42,6 +81,8 @@ export async function append(
      returning id, conversation_id, role, content, created_at`,
     [conversationId, role, content],
   );
+  // A new message changes the cached history — drop it so the next read repopulates.
+  await invalidateHistory(conversationId);
   return toMessage(rows[0]!);
 }
 
@@ -54,26 +95,16 @@ export async function listAsGeminiHistory(
   conversationId: string,
   limit: number = GEMINI_HISTORY_LIMIT,
 ): Promise<GeminiTurn[]> {
-  // Grab the most recent N rows (newest-first), then reverse to oldest-first
-  // because Gemini expects chronological order.
-  const { rows } = await query<{ role: ChatRole; content: string }>(
-    `select role, content
-     from messages
-     where conversation_id = $1
-     order by created_at desc
-     limit $2`,
-    [conversationId, limit],
-  );
-  return rows.reverse().map((r) => ({
-    role: r.role === "assistant" ? "model" : "user",
-    parts: [{ text: r.content }],
+  // Derive from the cached full list: the last `limit` messages, already
+  // oldest-first (the order Gemini expects).
+  const messages = await getCachedMessages(conversationId);
+  return messages.slice(-limit).map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
   }));
 }
 
 export async function countForConversation(conversationId: string): Promise<number> {
-  const { rows } = await query<{ count: string }>(
-    `select count(*)::text as count from messages where conversation_id = $1`,
-    [conversationId],
-  );
-  return Number(rows[0]?.count ?? 0);
+  const messages = await getCachedMessages(conversationId);
+  return messages.length;
 }

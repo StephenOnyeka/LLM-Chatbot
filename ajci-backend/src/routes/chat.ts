@@ -36,7 +36,7 @@ router.post(
     await append(conversation.id, "user", content);
     const history = await listAsGeminiHistory(conversation.id);
 
-    const cacheKey = hashPromptKey(env.GEMINI_MODEL, history);
+    const cacheKey = hashPromptKey(req.user!.id, env.GEMINI_MODEL, history);
     const cached = await getCachedReply(cacheKey);
 
     startSSE(res);

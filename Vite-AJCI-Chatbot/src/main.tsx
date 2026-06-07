@@ -7,7 +7,15 @@ import "./index.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false, refetchOnWindowFocus: false },
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+      // Treat fetched data as fresh for 5 min so navigating between sessions
+      // doesn't refetch on every mount; keep it in memory for 30 min. Explicit
+      // invalidateQueries (e.g. after sending a message) still forces a refetch.
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+    },
   },
 });
 
