@@ -36,3 +36,9 @@ export interface Credentials {
 export interface RegisterPayload extends Credentials {
   name: string;
 }
+
+export interface ResetPasswordPayload {
+  email: string;
+  code: string;
+  password: string;
+}

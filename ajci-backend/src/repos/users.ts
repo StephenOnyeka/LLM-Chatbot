@@ -5,9 +5,9 @@ import type { User } from "../types.js";
 // findUserById runs on every authenticated request (middleware/auth.ts), so its
 // result is cached in Redis to avoid a DB round-trip per request. Only positive
 // lookups are cached; a missing user is never cached, so the value shape stays
-// User (never null). Users are only ever created in this codebase — there is no
-// update/delete path — so no invalidation is needed. NOTE: if a user update or
-// delete path is ever added, it MUST `del user:<id>` to avoid stale identity.
+// User (never null). The only mutation path is updateUserPassword below, which
+// invalidates user:<id>. Any future update/delete path MUST do the same to avoid
+// stale identity.
 const USER_CACHE_TTL_SEC = 300; // 5 min
 const userCacheKey = (id: string) => `user:${id}`;
 
@@ -43,6 +43,22 @@ export async function findUserByEmail(
   const row = rows[0];
   if (!row) return null;
   return { id: row.id, email: row.email, name: row.name, passwordHash: row.password_hash };
+}
+
+export async function updateUserPassword(
+  userId: string,
+  passwordHash: string,
+): Promise<void> {
+  await query(`update users set password_hash = $2 where id = $1`, [
+    userId,
+    passwordHash,
+  ]);
+  try {
+    await getRedis().del(userCacheKey(userId));
+  } catch {
+    // best-effort cache invalidation; the cache only holds public identity
+    // fields (id/email/name), not the password, so a stale entry is harmless.
+  }
 }
 
 export async function findUserById(id: string): Promise<User | null> {

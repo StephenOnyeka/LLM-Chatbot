@@ -49,6 +49,14 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           error={login.error ? (login.error as Error).message : undefined}
         />
+        <div className="-mt-1 text-right text-sm">
+          <Link
+            to="/forgot-password"
+            className="text-[var(--color-accent)] hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Button type="submit" disabled={login.isPending} className="mt-2 w-full">
           {login.isPending ? <Spinner /> : "Sign in"}
         </Button>

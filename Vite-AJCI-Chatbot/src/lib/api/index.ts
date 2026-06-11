@@ -4,6 +4,7 @@ import type {
   Credentials,
   Message,
   RegisterPayload,
+  ResetPasswordPayload,
   Session,
   User,
 } from "../types";
@@ -89,6 +90,22 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      setToken(token);
+      return user;
+    },
+    forgotPassword: (email: string): Promise<{ ok: boolean }> =>
+      request<{ ok: boolean }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: async (payload: ResetPasswordPayload): Promise<User> => {
+      const { token, ...user } = await request<AuthResponse>(
+        "/auth/reset-password",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
       setToken(token);
       return user;
     },
