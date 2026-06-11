@@ -2,7 +2,7 @@ import { LogOut, MessageSquareText, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
 import { useAuth, useLogout } from "../../hooks/useAuth";
-import { useCreateSession, useDeleteSession, useSessions } from "../../hooks/useSessions";
+import { useDeleteSession, useNewChat, useSessions } from "../../hooks/useSessions";
 import { useUIStore } from "../../store/uiStore";
 import { cn } from "../../lib/cn";
 import { SessionItem } from "./SessionItem";
@@ -10,7 +10,7 @@ import { SessionItem } from "./SessionItem";
 export function Sidebar() {
   const { data: user } = useAuth();
   const sessions = useSessions();
-  const createSession = useCreateSession();
+  const newChat = useNewChat();
   const deleteSession = useDeleteSession();
   const logout = useLogout();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
@@ -38,10 +38,9 @@ export function Sidebar() {
           variant="primary"
           className="w-full"
           onClick={() => {
-            createSession.mutate();
+            newChat();
             setSidebar(false);
           }}
-          disabled={createSession.isPending}
         >
           <Plus className="h-4 w-4" />
           New chat

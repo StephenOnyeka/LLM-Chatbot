@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import EmptyState from "./components/chat/EmptyState";
 import ChatPage from "./routes/ChatPage";
 import ChatThread from "./routes/ChatThread";
+import DraftChat from "./routes/DraftChat";
 import ForgotPasswordPage from "./routes/ForgotPasswordPage";
 import LoginPage from "./routes/LoginPage";
 import RegisterPage from "./routes/RegisterPage";
@@ -15,7 +15,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/chat" element={<ChatPage />}>
-          <Route index element={<EmptyState />} />
+          <Route index element={<DraftChat />} />
           <Route path=":sessionId" element={<ChatThread />} />
         </Route>
       </Route>

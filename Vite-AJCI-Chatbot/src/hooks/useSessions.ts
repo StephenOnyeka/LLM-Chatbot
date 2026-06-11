@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import type { Message, Session } from "../lib/types";
+import type { Session } from "../lib/types";
 
 const KEY = ["sessions"] as const;
 
@@ -13,32 +13,14 @@ export function useSessions() {
   });
 }
 
-export function useCreateSession() {
-  const qc = useQueryClient();
+// "New chat" no longer creates a backend session — it just navigates to the
+// /chat draft. The session is created lazily when the user sends the first
+// message (see DraftChat). This keeps empty "New chat" rows out of history.
+export function useNewChat() {
   const navigate = useNavigate();
-  const { sessionId } = useParams<{ sessionId: string }>();
-
-  const mutation = useMutation({
-    mutationFn: () => api.sessions.create(),
-    onSuccess: (session) => {
-      qc.setQueryData<Session[]>(KEY, (prev) => [session, ...(prev ?? [])]);
-      navigate(`/chat/${session.id}`);
-    },
-  });
-
-  // If the chat already open has no messages, "New chat" is a no-op — stay on
-  // it instead of spawning another empty session. We only suppress when the
-  // messages are known-empty (cached as []); an unknown/undefined cache allows
-  // creation so a genuine new chat is never blocked.
-  const create = useCallback(() => {
-    if (sessionId) {
-      const cached = qc.getQueryData<Message[]>(["messages", sessionId]);
-      if (cached && cached.length === 0) return;
-    }
-    mutation.mutate();
-  }, [sessionId, qc, mutation]);
-
-  return { ...mutation, mutate: create };
+  return useCallback(() => {
+    navigate("/chat");
+  }, [navigate]);
 }
 
 export function useDeleteSession() {
