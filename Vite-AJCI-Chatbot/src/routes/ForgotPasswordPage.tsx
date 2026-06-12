@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { AuthLayout } from "../components/auth/AuthLayout";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { OtpInput } from "../components/ui/OtpInput";
+import { PasswordInput } from "../components/ui/PasswordInput";
 import { Spinner } from "../components/ui/Spinner";
 import { useForgotPassword, useResetPassword } from "../hooks/useAuth";
 
@@ -26,7 +28,9 @@ export default function ForgotPasswordPage() {
 
   function onReset(e: FormEvent) {
     e.preventDefault();
-    reset.mutate({ email, code, password });
+    if (code.length === 6) {
+      reset.mutate({ email, code, password });
+    }
   }
 
   const backToLogin = (
@@ -67,20 +71,16 @@ export default function ForgotPasswordPage() {
       subtitle={`We sent a 6-digit code to ${email}. Enter it below with your new password.`}
       footer={backToLogin}
     >
-      <form onSubmit={onReset} className="flex flex-col gap-4">
-        <Input
-          label="Reset code"
-          name="code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          required
+      <form onSubmit={onReset} className="flex flex-col gap-5">
+        <OtpInput
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+          onChange={setCode}
+          disabled={reset.isPending || reset.isSuccess}
+          error={!!reset.error}
+          autoFocus
         />
-        <Input
+        <PasswordInput
           label="New password"
-          type="password"
           name="password"
           autoComplete="new-password"
           required
@@ -89,7 +89,11 @@ export default function ForgotPasswordPage() {
           onChange={(e) => setPassword(e.target.value)}
           error={reset.error ? (reset.error as Error).message : undefined}
         />
-        <Button type="submit" disabled={reset.isPending} className="mt-2 w-full">
+        <Button
+          type="submit"
+          disabled={code.length < 6 || password.length < 6 || reset.isPending}
+          className="w-full"
+        >
           {reset.isPending ? <Spinner /> : "Reset password"}
         </Button>
         <button
@@ -107,3 +111,4 @@ export default function ForgotPasswordPage() {
     </AuthLayout>
   );
 }
+

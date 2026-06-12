@@ -49,6 +49,32 @@ export function useRegister() {
   });
 }
 
+// Step 1: send the Google ID token, get a code emailed, then go to the verify
+// page carrying the email it was sent to.
+export function useStartGoogleLogin() {
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: (credential: string) => api.auth.startGoogleLogin(credential),
+    onSuccess: ({ email }) => {
+      navigate("/google-verify", { state: { email } });
+    },
+  });
+}
+
+// Step 2: verify the emailed code and log in.
+export function useVerifyGoogleLogin() {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: ({ email, code }: { email: string; code: string }) =>
+      api.auth.verifyGoogleLogin(email, code),
+    onSuccess: (user) => {
+      qc.setQueryData(ME_KEY, user);
+      navigate("/chat", { replace: true });
+    },
+  });
+}
+
 export function useForgotPassword() {
   return useMutation({
     mutationFn: (email: string) => api.auth.forgotPassword(email),

@@ -33,6 +33,24 @@ export async function createUser(
   return { id: row.id, email: row.email, name: row.name };
 }
 
+// Find an existing user by email, or create one with no password (Google sign-in
+// users authenticate via their Google ID token, never a password). Atomic via
+// ON CONFLICT so two concurrent first-time sign-ins can't race to insert twice.
+export async function findOrCreateGoogleUser(
+  email: string,
+  name: string,
+): Promise<User> {
+  const { rows } = await query<UserRow>(
+    `insert into users (email, name)
+     values ($1, $2)
+     on conflict (email) do update set email = excluded.email
+     returning id, email, name, password_hash`,
+    [email.toLowerCase(), name],
+  );
+  const row = rows[0]!;
+  return { id: row.id, email: row.email, name: row.name };
+}
+
 export async function findUserByEmail(
   email: string,
 ): Promise<(User & { passwordHash: string }) | null> {

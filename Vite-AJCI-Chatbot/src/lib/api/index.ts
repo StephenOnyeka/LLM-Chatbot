@@ -93,6 +93,25 @@ export const api = {
       setToken(token);
       return user;
     },
+    // Step 1: hand Google's ID token to the backend, which emails a 6-digit
+    // code and returns the email to verify against.
+    startGoogleLogin: (credential: string): Promise<{ email: string }> =>
+      request<{ email: string }>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ credential }),
+      }),
+    // Step 2: submit the emailed code to finish signing in.
+    verifyGoogleLogin: async (email: string, code: string): Promise<User> => {
+      const { token, ...user } = await request<AuthResponse>(
+        "/auth/google/verify",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, code }),
+        },
+      );
+      setToken(token);
+      return user;
+    },
     forgotPassword: (email: string): Promise<{ ok: boolean }> =>
       request<{ ok: boolean }>("/auth/forgot-password", {
         method: "POST",

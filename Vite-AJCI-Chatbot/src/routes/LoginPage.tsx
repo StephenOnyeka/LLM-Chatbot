@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { AuthLayout } from "../components/auth/AuthLayout";
+import { GoogleButton } from "../components/auth/GoogleButton";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { PasswordInput } from "../components/ui/PasswordInput";
 import { Spinner } from "../components/ui/Spinner";
 import { useLogin } from "../hooks/useAuth";
 
@@ -39,9 +41,8 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Input
+        <PasswordInput
           label="Password"
-          type="password"
           name="password"
           autoComplete="current-password"
           required
@@ -60,6 +61,7 @@ export default function LoginPage() {
         <Button type="submit" disabled={login.isPending} className="mt-2 w-full">
           {login.isPending ? <Spinner /> : "Sign in"}
         </Button>
+        <GoogleButton />
       </form>
     </AuthLayout>
   );

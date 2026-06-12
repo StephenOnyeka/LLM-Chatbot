@@ -36,6 +36,9 @@ const schema = z.object({
   // Sandbox sender (onboarding@resend.dev) only delivers to the Resend account
   // owner's address. Swap for a verified-domain sender to email real users.
   RESEND_FROM: z.string().default("AJCI Chat <onboarding@resend.dev>"),
+  // Google OAuth client ID (Web). Used to verify the ID token the frontend
+  // sends from "Continue with Google".
+  GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
   // REDIS_URL: z.string().url().default("redis://localhost:6379"),
   REDIS_URL: z.string().url().default("redis://default:4UBAIHKcP5n0crPCYJM8ygOmPiGhpvZA@candied-likely-idea-98521.db.redis.io:10222"),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
