@@ -12,6 +12,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p . --noEmit",
     "db:init": "psql \"$DATABASE_URL\" -f sql/001_init.sql",
+    "db:migrate": "tsx src/migrate.ts",
     "worker": "tsx watch src/workers/aiWorker.ts",
     "worker:start": "node dist/workers/aiWorker.js"
   },
@@ -23,6 +24,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
+    "@types/multer": "^2.1.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
     "bcryptjs": "^2.4.3",
@@ -36,8 +38,10 @@
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "multer": "^2.1.1",
     "pg": "^8.13.1",
     "resend": "^6.12.4",
+    "stripe": "^22.2.0",
     "typescript": "^5.7.2",
     "uuid": "^11.0.3",
     "zod": "^3.23.8"

@@ -16,6 +16,20 @@ interface UserRow {
   email: string;
   name: string;
   password_hash: string;
+  is_pro: boolean;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+}
+
+function rowToUser(row: UserRow): User {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    isPro: row.is_pro,
+    stripeCustomerId: row.stripe_customer_id ?? undefined,
+    stripeSubscriptionId: row.stripe_subscription_id ?? undefined,
+  };
 }
 
 export async function createUser(
@@ -26,11 +40,10 @@ export async function createUser(
   const { rows } = await query<UserRow>(
     `insert into users (email, name, password_hash)
      values ($1, $2, $3)
-     returning id, email, name, password_hash`,
+     returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id`,
     [email.toLowerCase(), name, passwordHash],
   );
-  const row = rows[0]!;
-  return { id: row.id, email: row.email, name: row.name };
+  return rowToUser(rows[0]!);
 }
 
 // Find an existing user by email, or create one with no password (Google sign-in
@@ -44,23 +57,22 @@ export async function findOrCreateGoogleUser(
     `insert into users (email, name)
      values ($1, $2)
      on conflict (email) do update set email = excluded.email
-     returning id, email, name, password_hash`,
+     returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id`,
     [email.toLowerCase(), name],
   );
-  const row = rows[0]!;
-  return { id: row.id, email: row.email, name: row.name };
+  return rowToUser(rows[0]!);
 }
 
 export async function findUserByEmail(
   email: string,
 ): Promise<(User & { passwordHash: string }) | null> {
   const { rows } = await query<UserRow>(
-    `select id, email, name, password_hash from users where email = $1`,
+    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id from users where email = $1`,
     [email.toLowerCase()],
   );
   const row = rows[0];
   if (!row) return null;
-  return { id: row.id, email: row.email, name: row.name, passwordHash: row.password_hash };
+  return { ...rowToUser(row), passwordHash: row.password_hash };
 }
 
 export async function updateUserPassword(
@@ -79,6 +91,43 @@ export async function updateUserPassword(
   }
 }
 
+/** Upgrade or downgrade a user's Pro status and update Stripe fields. */
+export async function setUserProStatus(
+  userId: string,
+  isPro: boolean,
+  stripeCustomerId?: string,
+  stripeSubscriptionId?: string,
+): Promise<void> {
+  await query(
+    `update users
+     set is_pro = $2,
+         stripe_customer_id = coalesce($3, stripe_customer_id),
+         stripe_subscription_id = coalesce($4, stripe_subscription_id)
+     where id = $1`,
+    [userId, isPro, stripeCustomerId ?? null, stripeSubscriptionId ?? null],
+  );
+  // Invalidate cached user so next request reads fresh data
+  try {
+    await getRedis().del(userCacheKey(userId));
+  } catch {
+    // best-effort
+  }
+}
+
+/** Find a user by their Stripe customer ID (used in webhook fulfillment). */
+export async function findUserByStripeCustomerId(
+  customerId: string,
+): Promise<User | null> {
+  const { rows } = await query<UserRow>(
+    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id
+     from users where stripe_customer_id = $1`,
+    [customerId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return rowToUser(row);
+}
+
 export async function findUserById(id: string): Promise<User | null> {
   const key = userCacheKey(id);
 
@@ -90,12 +139,12 @@ export async function findUserById(id: string): Promise<User | null> {
   }
 
   const { rows } = await query<UserRow>(
-    `select id, email, name, password_hash from users where id = $1`,
+    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id from users where id = $1`,
     [id],
   );
   const row = rows[0];
   if (!row) return null; // don't cache negative lookups
-  const user: User = { id: row.id, email: row.email, name: row.name };
+  const user = rowToUser(row);
 
   try {
     await getRedis().set(key, JSON.stringify(user), "EX", USER_CACHE_TTL_SEC);

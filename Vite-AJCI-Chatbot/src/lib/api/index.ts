@@ -1,5 +1,6 @@
-import { ApiError, authHeaders, clearToken, request, setToken } from "./client";
+import { ApiError, authHeaders, clearToken, request, setToken, getToken } from "./client";
 import type {
+  Attachment,
   AuthResponse,
   Credentials,
   Message,
@@ -12,13 +13,14 @@ import type {
 async function* streamChat(
   sessionId: string,
   content: string,
+  attachments?: Attachment[],
 ): AsyncIterable<string> {
   const base = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/+$/, "");
   const res = await fetch(`${base}/sessions/${sessionId}/chat`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, attachments }),
   });
 
   if (!res.ok || !res.body) {
@@ -150,6 +152,33 @@ export const api = {
       request<void>(`/sessions/${id}`, { method: "DELETE" }),
     messages: (sessionId: string) =>
       request<Message[]>(`/sessions/${sessionId}/messages`),
+  },
+  stripe: {
+    createCheckoutSession: () =>
+      request<{ url: string }>("/stripe/create-checkout-session", { method: "POST" }),
+    verifySession: (sessionId: string) =>
+      request<{ ok: boolean; isPro: boolean }>(`/stripe/verify-session?session_id=${sessionId}`),
+  },
+  upload: async (file: File): Promise<Attachment> => {
+    const base = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/+$/, "");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${base}/upload`, {
+      method: "POST",
+      body: formData,
+      headers, // omit Content-Type so browser sets boundary for multipart/form-data
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      throw new ApiError(res.status, text || res.statusText);
+    }
+    return res.json() as Promise<Attachment>;
   },
   streamChat,
 };

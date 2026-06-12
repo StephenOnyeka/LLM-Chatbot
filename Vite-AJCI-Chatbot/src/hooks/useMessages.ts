@@ -27,14 +27,15 @@ export function useSendMessage(sessionId: string | undefined) {
   );
 
   return useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (payload: { content: string; attachments?: Attachment[] }) => {
       if (!sessionId) throw new Error("No session selected");
 
       const userMsg: Message = {
         id: uid("usr"),
         sessionId,
         role: "user",
-        content,
+        content: payload.content,
+        attachments: payload.attachments,
         createdAt: new Date().toISOString(),
       };
       const assistantId = uid("ast");
@@ -50,7 +51,7 @@ export function useSendMessage(sessionId: string | undefined) {
       updateMessages((prev) => [...prev, userMsg, assistantMsg]);
 
       try {
-        for await (const token of api.streamChat(sessionId, content)) {
+        for await (const token of api.streamChat(sessionId, payload.content, payload.attachments)) {
           updateMessages((prev) =>
             prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
           );

@@ -4,6 +4,7 @@ import { Composer } from "../components/chat/Composer";
 import { MessageList } from "../components/chat/MessageList";
 import { Spinner } from "../components/ui/Spinner";
 import { useMessages, useSendMessage } from "../hooks/useMessages";
+import type { Attachment } from "../lib/types";
 
 export default function ChatThread() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -14,14 +15,17 @@ export default function ChatThread() {
   // A draft created from /chat hands its first message via navigation state.
   // Send it once on mount, then clear the history entry so a refresh/back nav
   // doesn't resend it. useRef guards against StrictMode's double-invoke.
-  const pending = (location.state as { pending?: string } | null)?.pending;
+  type State = { pending?: string; pendingAttachments?: Attachment[] } | null;
+  const pending = (location.state as State)?.pending;
+  const pendingAttachments = (location.state as State)?.pendingAttachments;
   const sentPending = useRef(false);
+  
   useEffect(() => {
-    if (!pending || sentPending.current || !sessionId) return;
+    if ((!pending && !(pendingAttachments && pendingAttachments.length > 0)) || sentPending.current || !sessionId) return;
     sentPending.current = true;
-    send.mutate(pending);
+    send.mutate({ content: pending || "", attachments: pendingAttachments });
     window.history.replaceState({}, "");
-  }, [pending, sessionId, send]);
+  }, [pending, pendingAttachments, sessionId, send]);
 
   if (messages.isPending) {
     return (
@@ -42,7 +46,7 @@ export default function ChatThread() {
       ) : (
         <MessageList messages={list} />
       )}
-      <Composer onSend={(content) => send.mutate(content)} disabled={send.isPending} />
+      <Composer onSend={(content, attachments) => send.mutate({ content, attachments })} disabled={send.isPending} />
     </>
   );
 }

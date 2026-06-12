@@ -44,6 +44,14 @@ const schema = z.object({
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_CHAT_PER_MINUTE: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_AUTH_PER_MINUTE: z.coerce.number().int().positive().default(10),
+  // Stripe (Pro Plan payments)
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PRICE_ID: z.string().optional(),
+  // Where to store uploaded files on disk (relative to project root)
+  UPLOAD_DIR: z.string().default("uploads"),
+  // Public base URL of this backend (used to generate upload URLs)
+  PUBLIC_URL: z.string().default("http://localhost:4000"),
 });
 
 const parsed = schema.safeParse(process.env);

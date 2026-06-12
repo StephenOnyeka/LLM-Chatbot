@@ -9,6 +9,9 @@ import { rateLimit } from "./middleware/rateLimit.js";
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
 import sessionsRoutes from "./routes/sessions.js";
+import stripeRoutes from "./routes/stripe.js";
+import uploadRoutes from "./routes/upload.js";
+import { resolve } from "node:path";
 
 export function createApp() {
   const app = express();
@@ -35,6 +38,10 @@ export function createApp() {
       credentials: true,
     }),
   );
+  
+  // Stripe webhook MUST be before express.json() so it gets the raw buffer
+  app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
+  
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
   if (!isProd) app.use(morgan("dev"));
@@ -52,6 +59,11 @@ export function createApp() {
   app.use("/api/auth", authRoutes);
   app.use("/api/sessions", sessionsRoutes);
   app.use("/api/sessions", chatRoutes);
+  app.use("/api/stripe", stripeRoutes);
+  app.use("/api/upload", uploadRoutes);
+  
+  // Serve uploaded files statically under /api/uploads
+  app.use("/api/uploads", express.static(resolve(process.cwd(), env.UPLOAD_DIR)));
 
   app.use(notFound);
   app.use(errorHandler);

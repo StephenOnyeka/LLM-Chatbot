@@ -4,6 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  isPro?: boolean;
 }
 
 // Login/register return the user plus a JWT for Authorization: Bearer auth
@@ -19,6 +20,12 @@ export interface Session {
   updatedAt: string;
 }
 
+export interface Attachment {
+  url: string;
+  name: string;
+  mimeType: string;
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -26,6 +33,7 @@ export interface Message {
   content: string;
   createdAt: string;
   pending?: boolean;
+  attachments?: Attachment[];
 }
 
 export interface Credentials {

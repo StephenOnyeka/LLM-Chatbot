@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { PiOpenAiLogoFill } from "react-icons/pi";
 import { Composer } from "../components/chat/Composer";
 import { api } from "../lib/api";
-import type { Message, Session } from "../lib/types";
+import type { Attachment, Message, Session } from "../lib/types";
 
 // The /chat landing page is a *draft*: it shows the composer but creates no
 // backend session. A conversation row is only created when the user sends their
@@ -15,7 +15,7 @@ export default function DraftChat() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 
-  async function onSend(content: string) {
+  async function onSend(content: string, attachments?: Attachment[]) {
     if (creating) return;
     setCreating(true);
     try {
@@ -25,7 +25,7 @@ export default function DraftChat() {
       qc.setQueryData<Message[]>(["messages", session.id], []);
       qc.setQueryData<Session[]>(["sessions"], (prev) => [session, ...(prev ?? [])]);
       // Hand the first message to the thread, which sends it on mount.
-      navigate(`/chat/${session.id}`, { state: { pending: content } });
+      navigate(`/chat/${session.id}`, { state: { pending: content, pendingAttachments: attachments } });
     } catch {
       setCreating(false);
     }

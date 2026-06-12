@@ -14,11 +14,22 @@ import { HttpError } from "../middleware/error.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { getOwned, rename, touch } from "../repos/conversations.js";
 import { append, countForConversation, listAsGeminiHistory } from "../repos/messages.js";
+import type { Attachment } from "../types.js";
 
 const router = Router();
 router.use(requireAuth);
 
-const ChatBody = z.object({ content: z.string().trim().min(1).max(8000) });
+const AttachmentSchema = z.object({
+  url: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+  localPath: z.string(),
+});
+
+const ChatBody = z.object({
+  content: z.string().trim().max(8000).default(""),
+  attachments: z.array(AttachmentSchema).max(5).optional(),
+});
 
 const CACHE_REPLAY_CHUNK = 40;
 
@@ -29,11 +40,21 @@ router.post(
     const conversation = await getOwned(req.params.id!, req.user!.id);
     if (!conversation) throw new HttpError(404, "Session not found");
 
-    const { content } = ChatBody.parse(req.body);
+    const { content, attachments } = ChatBody.parse(req.body);
+
+    // Require at least text OR attachments
+    if (!content && (!attachments || attachments.length === 0)) {
+      throw new HttpError(400, "Message must have content or attachments.");
+    }
+
+    // Only Pro users may include file attachments
+    if (attachments && attachments.length > 0 && !req.user!.isPro) {
+      throw new HttpError(403, "File uploads require a Pro plan.");
+    }
 
     const wasEmpty = (await countForConversation(conversation.id)) === 0;
 
-    await append(conversation.id, "user", content);
+    await append(conversation.id, "user", content, attachments as Attachment[] | undefined);
     const history = await listAsGeminiHistory(conversation.id);
 
     const cacheKey = hashPromptKey(req.user!.id, env.GEMINI_MODEL, history);
@@ -94,7 +115,11 @@ router.post(
 
     try {
       if (wasEmpty && conversation.title === "New chat") {
-        const title = content.length > 60 ? `${content.slice(0, 60)}…` : content;
+        let titleText = content;
+        if (!titleText && attachments && attachments.length > 0) {
+          titleText = `File: ${attachments[0]?.name || "upload"}`;
+        }
+        const title = titleText.length > 60 ? `${titleText.slice(0, 60)}…` : (titleText || "New chat");
         await rename(conversation.id, title);
       } else {
         await touch(conversation.id);

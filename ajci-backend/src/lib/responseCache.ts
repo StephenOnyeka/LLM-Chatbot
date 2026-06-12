@@ -18,7 +18,11 @@ export function hashPromptKey(
     model,
     history: history.map((t) => ({
       role: t.role,
-      parts: t.parts.map((p) => ({ text: p.text })),
+      parts: t.parts.map((p) => {
+        if ("text" in p) return { text: p.text };
+        if ("inlineData" in p) return { inlineData: { mimeType: p.inlineData.mimeType, data: p.inlineData.data } };
+        return {};
+      }),
     })),
   });
   const hex = createHash("sha256").update(canonical).digest("hex");

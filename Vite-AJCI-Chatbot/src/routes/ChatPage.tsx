@@ -1,12 +1,39 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Menu, MessageSquareText } from "lucide-react";
-import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useSearchParams } from "react-router-dom";
 import { Sidebar } from "../components/chat/Sidebar";
+import { api } from "../lib/api";
 import { useUIStore } from "../store/uiStore";
 
 export default function ChatPage() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSidebar = useUIStore((s) => s.setSidebar);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    const success = searchParams.get("payment_success");
+    const sessionId = searchParams.get("session_id");
+
+    if (success === "true" && sessionId) {
+      api.stripe.verifySession(sessionId)
+        .then(() => {
+          alert("Payment successful! You are now a Pro member. You can upload images and files!");
+          qc.invalidateQueries({ queryKey: ["auth", "me"] });
+        })
+        .catch((err) => {
+          console.error("Failed to verify session:", err);
+        })
+        .finally(() => {
+          // Clean up the URL
+          searchParams.delete("payment_success");
+          searchParams.delete("session_id");
+          setSearchParams(searchParams, { replace: true });
+        });
+    }
+  }, [searchParams, setSearchParams, qc]);
 
   return (
     <div className="flex h-full">

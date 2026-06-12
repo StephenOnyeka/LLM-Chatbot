@@ -1,7 +1,8 @@
+import { readFile } from "node:fs/promises";
 import { query } from "../db.js";
 import type { GeminiTurn } from "../lib/gemini.js";
 import { getRedis } from "../lib/redis.js";
-import type { ChatRole, Message } from "../types.js";
+import type { Attachment, ChatRole, Message } from "../types.js";
 
 interface Row {
   id: string;
@@ -9,6 +10,7 @@ interface Row {
   role: ChatRole;
   content: string;
   created_at: Date;
+  attachments: Attachment[] | null;
 }
 
 function toMessage(r: Row): Message {
@@ -18,6 +20,7 @@ function toMessage(r: Row): Message {
     role: r.role,
     content: r.content,
     createdAt: r.created_at.toISOString(),
+    attachments: r.attachments ?? undefined,
   };
 }
 
@@ -49,7 +52,7 @@ async function getCachedMessages(conversationId: string): Promise<Message[]> {
   }
 
   const { rows } = await query<Row>(
-    `select id, conversation_id, role, content, created_at
+    `select id, conversation_id, role, content, created_at, attachments
      from messages
      where conversation_id = $1
      order by created_at asc`,
@@ -74,12 +77,13 @@ export async function append(
   conversationId: string,
   role: ChatRole,
   content: string,
+  attachments?: Attachment[],
 ): Promise<Message> {
   const { rows } = await query<Row>(
-    `insert into messages (conversation_id, role, content)
-     values ($1, $2, $3)
-     returning id, conversation_id, role, content, created_at`,
-    [conversationId, role, content],
+    `insert into messages (conversation_id, role, content, attachments)
+     values ($1, $2, $3, $4)
+     returning id, conversation_id, role, content, created_at, attachments`,
+    [conversationId, role, content, attachments ? JSON.stringify(attachments) : null],
   );
   // A new message changes the cached history — drop it so the next read repopulates.
   await invalidateHistory(conversationId);
@@ -98,10 +102,42 @@ export async function listAsGeminiHistory(
   // Derive from the cached full list: the last `limit` messages, already
   // oldest-first (the order Gemini expects).
   const messages = await getCachedMessages(conversationId);
-  return messages.slice(-limit).map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
+  const slice = messages.slice(-limit);
+
+  const turns: GeminiTurn[] = [];
+  for (const m of slice) {
+    const parts: GeminiTurn["parts"] = [];
+
+    // Include any file attachments as inlineData (base64) for the Gemini API.
+    if (m.attachments && m.attachments.length > 0) {
+      for (const att of m.attachments) {
+        try {
+          const data = await readFile(att.localPath);
+          parts.push({
+            inlineData: {
+              mimeType: att.mimeType,
+              data: data.toString("base64"),
+            },
+          });
+        } catch {
+          // File may have been deleted; skip gracefully
+        }
+      }
+    }
+
+    if (m.content) {
+      parts.push({ text: m.content });
+    }
+
+    if (parts.length > 0) {
+      turns.push({
+        role: m.role === "assistant" ? "model" : "user",
+        parts,
+      });
+    }
+  }
+
+  return turns;
 }
 
 export async function countForConversation(conversationId: string): Promise<number> {
