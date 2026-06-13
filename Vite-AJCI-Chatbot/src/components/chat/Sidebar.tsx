@@ -62,6 +62,7 @@ export function Sidebar() {
       <div className="px-3">
         <Button
           variant="primary"
+          // variant="secondary"
           className="w-full"
           onClick={() => {
             newChat();
