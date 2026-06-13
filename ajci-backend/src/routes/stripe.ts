@@ -5,9 +5,11 @@ import { asyncHandler } from "../middleware/asyncHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { HttpError } from "../middleware/error.js";
 import {
+  findUserById,
   findUserByStripeCustomerId,
   setUserProStatus,
 } from "../repos/users.js";
+import { sendProCancelEmail, sendProUpgradeEmail } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -16,6 +18,19 @@ function getStripe(): Stripe {
     throw new HttpError(503, "Payment system is not configured.");
   }
   return new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: "2026-05-27.dahlia" });
+}
+
+/**
+ * Extract the current billing-period end from a Stripe subscription as an ISO
+ * string. In recent API versions current_period_end lives on the subscription
+ * item; we fall back to the (legacy) top-level field if present.
+ */
+function periodEndIso(sub: Stripe.Subscription | null | undefined): string | undefined {
+  if (!sub) return undefined;
+  const unix =
+    sub.items?.data?.[0]?.current_period_end ??
+    (sub as unknown as { current_period_end?: number }).current_period_end;
+  return typeof unix === "number" ? new Date(unix * 1000).toISOString() : undefined;
 }
 
 /**
@@ -107,12 +122,33 @@ router.get(
       typeof session.customer === "string"
         ? session.customer
         : session.customer?.id;
+    const subscription =
+      typeof session.subscription === "string"
+        ? null
+        : (session.subscription as Stripe.Subscription | null);
     const subscriptionId =
       typeof session.subscription === "string"
         ? session.subscription
-        : (session.subscription as Stripe.Subscription | null)?.id;
+        : subscription?.id;
+    const expiresAt = periodEndIso(subscription);
 
-    await setUserProStatus(userId, true, customerId, subscriptionId);
+    // setUserProStatus reads the previous is_pro atomically and returns it, so
+    // the welcome email fires only on the first upgrade — even if the success
+    // URL is reloaded (the old cached-read approach could send twice).
+    const wasPro = await setUserProStatus(
+      userId,
+      true,
+      customerId,
+      subscriptionId,
+      expiresAt,
+    );
+
+    if (wasPro === false) {
+      sendProUpgradeEmail(req.user!.email, req.user!.name).catch((err) => {
+        console.error("Failed to send Pro welcome email in verify-session:", err);
+      });
+    }
+
     res.json({ ok: true, isPro: true });
   }),
 );
@@ -162,7 +198,35 @@ router.post(
             typeof session.subscription === "string"
               ? session.subscription
               : undefined;
-          await setUserProStatus(userId, true, customerId, subscriptionId);
+
+          // The webhook payload only carries the subscription id, so fetch the
+          // full subscription to read the current billing-period end.
+          let expiresAt: string | undefined;
+          if (subscriptionId) {
+            try {
+              const sub = await stripe.subscriptions.retrieve(subscriptionId);
+              expiresAt = periodEndIso(sub);
+            } catch (err) {
+              console.error("Failed to retrieve subscription for expiry:", err);
+            }
+          }
+
+          // We still need the user's email/name for the welcome email; load it,
+          // but use the atomic previous-status return value for the send guard.
+          const user = await findUserById(userId);
+          const wasPro = await setUserProStatus(
+            userId,
+            true,
+            customerId,
+            subscriptionId,
+            expiresAt,
+          );
+
+          if (wasPro === false && user) {
+            sendProUpgradeEmail(user.email, user.name).catch((err) => {
+              console.error("Failed to send Pro welcome email in webhook:", err);
+            });
+          }
         }
         break;
       }
@@ -173,6 +237,7 @@ router.post(
           typeof sub.customer === "string" ? sub.customer : sub.customer.id;
         const user = await findUserByStripeCustomerId(customerId);
         if (user) {
+          // isPro=false also clears pro_expires_at inside setUserProStatus.
           await setUserProStatus(user.id, false);
         }
         break;
@@ -190,6 +255,52 @@ router.post(
     }
 
     res.json({ received: true });
+  }),
+);
+
+/**
+ * POST /api/stripe/cancel-subscription
+ * Lets a Pro user cancel and downgrade themselves (used during testing and as
+ * the in-app "Cancel Pro" action). Cancels immediately so the change is visible
+ * right away even when STRIPE_WEBHOOK_SECRET isn't configured.
+ */
+router.post(
+  "/cancel-subscription",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id;
+    const user = await findUserById(userId);
+    if (!user?.isPro) {
+      throw new HttpError(400, "You are not a Pro member.");
+    }
+    if (!user.stripeSubscriptionId) {
+      throw new HttpError(400, "No active subscription found to cancel.");
+    }
+
+    const stripe = getStripe();
+
+    // Immediate cancellation. To instead cancel at the end of the paid period,
+    // swap this for:
+    //   await stripe.subscriptions.update(user.stripeSubscriptionId, { cancel_at_period_end: true });
+    // and skip the setUserProStatus(false) below — the customer.subscription.deleted
+    // webhook will downgrade them when the period actually ends.
+    try {
+      await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+    } catch (err) {
+      const message = (err as Error).message;
+      // If the subscription is already gone on Stripe's side, proceed to
+      // downgrade locally rather than blocking the user.
+      console.error("Stripe subscription cancel failed:", message);
+    }
+
+    // Downgrade now (also clears pro_expires_at) instead of waiting on a webhook.
+    await setUserProStatus(userId, false);
+
+    sendProCancelEmail(user.email, user.name).catch((err) => {
+      console.error("Failed to send Pro cancellation email:", err);
+    });
+
+    res.json({ ok: true, isPro: false });
   }),
 );
 

@@ -1,11 +1,22 @@
-import { LogOut, MessageSquareText, Plus } from "lucide-react";
+import { Crown, LogOut, MessageSquareText, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
-import { useAuth, useLogout } from "../../hooks/useAuth";
+import { useAuth, useCancelPro, useLogout } from "../../hooks/useAuth";
 import { useDeleteSession, useNewChat, useSessions } from "../../hooks/useSessions";
 import { useUIStore } from "../../store/uiStore";
 import { cn } from "../../lib/cn";
 import { SessionItem } from "./SessionItem";
+
+function formatPlanDate(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export function Sidebar() {
   const { data: user } = useAuth();
@@ -13,8 +24,23 @@ export function Sidebar() {
   const newChat = useNewChat();
   const deleteSession = useDeleteSession();
   const logout = useLogout();
+  const cancelPro = useCancelPro();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebar = useUIStore((s) => s.setSidebar);
+
+  function handleCancelPro() {
+    const confirmed = window.confirm(
+      "Cancel your Pro plan? You'll lose file & image uploads immediately and your account returns to the Free plan.",
+    );
+    if (!confirmed) return;
+    cancelPro.mutate(undefined, {
+      onError: () => {
+        alert("Failed to cancel your subscription. Please try again.");
+      },
+    });
+  }
+
+  const renewsOn = formatPlanDate(user?.proExpiresAt);
 
   return (
     <aside
@@ -71,6 +97,31 @@ export function Sidebar() {
           </p>
         )}
       </div>
+
+      {user?.isPro && (
+        <div className="px-3 pb-1">
+          <div className="rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-3">
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-[var(--color-accent)]" />
+              <span className="text-sm font-semibold text-[var(--color-text)]">Pro plan</span>
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {renewsOn ? `Renews on ${renewsOn}` : "Active subscription"}
+            </p>
+            <button
+              type="button"
+              onClick={handleCancelPro}
+              disabled={cancelPro.isPending}
+              className={cn(
+                "mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]",
+                cancelPro.isPending && "opacity-70 pointer-events-none",
+              )}
+            >
+              {cancelPro.isPending ? <Spinner className="h-3.5 w-3.5" /> : "Cancel Pro"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-[var(--color-border)] p-3">
         <div className="flex items-center gap-3 px-2 py-2">

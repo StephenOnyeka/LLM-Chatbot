@@ -93,6 +93,16 @@ export function useResetPassword() {
   });
 }
 
+export function useCancelPro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.stripe.cancelSubscription(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ME_KEY });
+    },
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   const navigate = useNavigate();

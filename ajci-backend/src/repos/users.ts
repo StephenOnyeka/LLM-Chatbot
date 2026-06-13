@@ -19,6 +19,7 @@ interface UserRow {
   is_pro: boolean;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  pro_expires_at: Date | string | null;
 }
 
 function rowToUser(row: UserRow): User {
@@ -29,6 +30,9 @@ function rowToUser(row: UserRow): User {
     isPro: row.is_pro,
     stripeCustomerId: row.stripe_customer_id ?? undefined,
     stripeSubscriptionId: row.stripe_subscription_id ?? undefined,
+    proExpiresAt: row.pro_expires_at
+      ? new Date(row.pro_expires_at).toISOString()
+      : undefined,
   };
 }
 
@@ -40,7 +44,7 @@ export async function createUser(
   const { rows } = await query<UserRow>(
     `insert into users (email, name, password_hash)
      values ($1, $2, $3)
-     returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id`,
+     returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id, pro_expires_at`,
     [email.toLowerCase(), name, passwordHash],
   );
   return rowToUser(rows[0]!);
@@ -57,7 +61,7 @@ export async function findOrCreateGoogleUser(
     `insert into users (email, name)
      values ($1, $2)
      on conflict (email) do update set email = excluded.email
-     returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id`,
+     returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id, pro_expires_at`,
     [email.toLowerCase(), name],
   );
   return rowToUser(rows[0]!);
@@ -67,7 +71,7 @@ export async function findUserByEmail(
   email: string,
 ): Promise<(User & { passwordHash: string }) | null> {
   const { rows } = await query<UserRow>(
-    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id from users where email = $1`,
+    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id, pro_expires_at from users where email = $1`,
     [email.toLowerCase()],
   );
   const row = rows[0];
@@ -91,20 +95,41 @@ export async function updateUserPassword(
   }
 }
 
-/** Upgrade or downgrade a user's Pro status and update Stripe fields. */
+/**
+ * Upgrade or downgrade a user's Pro status and update Stripe fields.
+ * Returns the user's PREVIOUS is_pro value (read atomically inside the same
+ * UPDATE) so callers can decide whether this is a first-time upgrade and avoid
+ * sending the welcome email twice. Returns null if the user doesn't exist.
+ *
+ * When downgrading (isPro=false) the expiry is cleared; when upgrading,
+ * proExpiresAt is coalesced so a missing value won't wipe an existing date.
+ */
 export async function setUserProStatus(
   userId: string,
   isPro: boolean,
   stripeCustomerId?: string,
   stripeSubscriptionId?: string,
-): Promise<void> {
-  await query(
-    `update users
+  proExpiresAt?: string,
+): Promise<boolean | null> {
+  const { rows } = await query<{ prev_is_pro: boolean }>(
+    `update users u
      set is_pro = $2,
          stripe_customer_id = coalesce($3, stripe_customer_id),
-         stripe_subscription_id = coalesce($4, stripe_subscription_id)
-     where id = $1`,
-    [userId, isPro, stripeCustomerId ?? null, stripeSubscriptionId ?? null],
+         stripe_subscription_id = coalesce($4, stripe_subscription_id),
+         pro_expires_at = case
+           when $2 = false then null
+           else coalesce($5::timestamptz, pro_expires_at)
+         end
+     from (select is_pro from users where id = $1) as old
+     where u.id = $1
+     returning old.is_pro as prev_is_pro`,
+    [
+      userId,
+      isPro,
+      stripeCustomerId ?? null,
+      stripeSubscriptionId ?? null,
+      proExpiresAt ?? null,
+    ],
   );
   // Invalidate cached user so next request reads fresh data
   try {
@@ -112,6 +137,7 @@ export async function setUserProStatus(
   } catch {
     // best-effort
   }
+  return rows[0]?.prev_is_pro ?? null;
 }
 
 /** Find a user by their Stripe customer ID (used in webhook fulfillment). */
@@ -119,7 +145,7 @@ export async function findUserByStripeCustomerId(
   customerId: string,
 ): Promise<User | null> {
   const { rows } = await query<UserRow>(
-    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id
+    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id, pro_expires_at
      from users where stripe_customer_id = $1`,
     [customerId],
   );
@@ -139,7 +165,7 @@ export async function findUserById(id: string): Promise<User | null> {
   }
 
   const { rows } = await query<UserRow>(
-    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id from users where id = $1`,
+    `select id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id, pro_expires_at from users where id = $1`,
     [id],
   );
   const row = rows[0];

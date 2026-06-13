@@ -97,3 +97,48 @@ The worker connects to the same `REDIS_URL` and consumes the `ai-jobs` queue. Cu
 ## 8. Pairing with the Vite frontend
 
 The frontend (`../Vite-AJCI-Chatbot`) proxies `/api → http://localhost:4000` in dev (see `vite.config.ts`), so cookies share the `localhost:5173` origin. To switch the frontend off the in-memory mock and onto this backend, replace the mock imports in `Vite-AJCI-Chatbot/src/lib/api/index.ts` with `fetch` calls through `client.ts` (see plan, Phase 3).
+
+## 9. Stripe & Pro Plan Integration
+
+To support file/image uploads, users must upgrade to the **Pro Plan** through Stripe checkout.
+
+### Env Configuration:
+- `STRIPE_SECRET_KEY` — Your Stripe Test mode secret key (`sk_test_...`) or a restricted key with write access to Checkout Sessions, Customers, and Subscriptions.
+- `STRIPE_PRICE_ID` *(Optional)* — If left blank, the backend automatically generates a $10/mo inline price.
+- `STRIPE_WEBHOOK_SECRET` *(Optional for dev)* — Only required if you want real-time webhook sync. If blank, instant upgrade is handled automatically upon successful redirect via redirect session validation.
+
+### Testing Payments in Test Mode:
+When redirected to Stripe checkout:
+* **Card Number:** `4242 4242 4242 4242`
+* **Expiry Date:** Any future date (e.g., `12/30`)
+* **CVC:** Any 3 digits (e.g., `123`)
+* **Name & Postal Code:** Any mock values
+
+### Plan expiry & renewal date
+
+The subscription auto-renews monthly. On upgrade we store the current billing
+period end in `users.pro_expires_at` (migration `004_pro_expiry.sql`), read from
+the Stripe subscription's `current_period_end`. It's exposed on `/api/auth/me`
+as `proExpiresAt` and shown in the sidebar as a "Renews on …" date. The column
+is cleared to `null` whenever the user downgrades.
+
+A user stays Pro until either:
+* the `customer.subscription.deleted` webhook fires (requires
+  `STRIPE_WEBHOOK_SECRET`), or
+* they cancel via the endpoint below (works without webhooks).
+
+### Cancelling / self-downgrade (for testing)
+
+`POST /api/stripe/cancel-subscription` (authenticated) cancels the user's Stripe
+subscription **immediately**, flips `is_pro` to `false`, clears `pro_expires_at`,
+and emails a cancellation confirmation. From the app, Pro users get a
+**Cancel Pro** button in the sidebar. To trigger it manually:
+
+```bash
+curl -X POST http://localhost:4000/api/stripe/cancel-subscription \
+  -H "Authorization: Bearer <jwt>"
+```
+
+To switch to end-of-period cancellation instead of immediate, see the commented
+one-line swap in `src/routes/stripe.ts` (`cancel_at_period_end: true`).
+

@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   isPro?: boolean;
+  proExpiresAt?: string; // ISO timestamp of current billing period end
 }
 
 // Login/register return the user plus a JWT for Authorization: Bearer auth

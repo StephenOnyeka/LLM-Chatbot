@@ -158,6 +158,8 @@ export const api = {
       request<{ url: string }>("/stripe/create-checkout-session", { method: "POST" }),
     verifySession: (sessionId: string) =>
       request<{ ok: boolean; isPro: boolean }>(`/stripe/verify-session?session_id=${sessionId}`),
+    cancelSubscription: () =>
+      request<{ ok: boolean; isPro: boolean }>("/stripe/cancel-subscription", { method: "POST" }),
   },
   upload: async (file: File): Promise<Attachment> => {
     const base = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/+$/, "");

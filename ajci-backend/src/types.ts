@@ -14,6 +14,7 @@ export interface User {
   isPro?: boolean;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  proExpiresAt?: string; // ISO timestamp of current billing period end
 }
 
 export interface Session {
