@@ -216,7 +216,7 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
                 type="button"
                 onClick={submit}
                 disabled={disabled || uploading}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-600 text-white transition hover:bg-[#3b78e0] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-600 text-white transition disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Send message"
               >
                 {uploading ? (

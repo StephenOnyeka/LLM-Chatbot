@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+// import { PiOpenAiLogoFill } from "react-icons/pi";
 import { Composer } from "../components/chat/Composer";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
@@ -39,9 +40,24 @@ export default function DraftChat() {
   return (
     <div className="gemini-landing flex flex-1 flex-col items-center justify-end px-4 pb-8 sm:justify-center sm:pb-0">
       {/* Greeting */}
+      {/* <h1 className="mb-8 text-center text-2xl font-normal text-white/90 sm:text-3xl md:text-4xl">
+        How can I help {firstName}?
+      </h1> */}
+
+      {/* <div className="flex h-12 w-12 mb-4 items-center justify-center rounded-2xl bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
+        <PiOpenAiLogoFill className="h-6 w-6" />
+      </div> */}
       <h1 className="mb-8 text-center text-2xl font-normal text-white/90 sm:text-3xl md:text-4xl">
-        What's the vibe, {firstName}?
+        How can I help {firstName}?
       </h1>
+
+      {/* <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
+          <PiOpenAiLogoFill className="h-6 w-6" />
+        </div>
+        <h2 className="mt-4 text-lg font-semibold">Start a conversation</h2>
+        <p className="mt-1 max-w-sm text-sm text-[var(--color-text-muted)]">
+          Type a message below to begin chatting with the assistant.
+        </p> */}
 
       {/* Composer */}
       <div className="w-full max-w-2xl">
