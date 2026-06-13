@@ -36,6 +36,9 @@ const schema = z.object({
   // Sandbox sender (onboarding@resend.dev) only delivers to the Resend account
   // owner's address. Swap for a verified-domain sender to email real users.
   RESEND_FROM: z.string().default("AJCI Chat <onboarding@resend.dev>"),
+  // Public https base URL where email image assets (icon PNGs) are hosted.
+  // Defaults to the deployed frontend; override for a staging/custom domain.
+  EMAIL_ASSET_BASE_URL: z.string().default("https://ajci-chatbot.vercel.app"),
   // Google OAuth client ID (Web). Used to verify the ID token the frontend
   // sends from "Continue with Google".
   GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),

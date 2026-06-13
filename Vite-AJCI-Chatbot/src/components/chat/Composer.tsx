@@ -1,8 +1,7 @@
-import { Plus, Send, X, File, FileText, Image as ImageIcon } from "lucide-react";
+import { Plus, Send, X, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
-import { cn } from "../../lib/cn";
 import type { Attachment } from "../../lib/types";
 import { Spinner } from "../ui/Spinner";
 import { TextArea } from "../ui/TextArea";

@@ -1,4 +1,4 @@
-import { CheckCircle2, Crown, X } from "lucide-react";
+import { Crown, X } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../lib/api";
 import { cn } from "../../lib/cn";
@@ -8,6 +8,13 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const FEATURES: { icon: string; label: string }[] = [
+  { icon: "/email/cloudUpload.png", label: "Unlimited image and file uploads" },
+  { icon: "/email/visibility.png", label: "Advanced vision analysis of your documents" },
+  { icon: "/email/rocketLaunch.png", label: "Priority processing and faster responses" },
+  { icon: "/email/rocketLaunch.png", label: "Early access to new experimental features" },
+];
 
 export function UpgradeModal({ isOpen, onClose }: Props) {
   const [loading, setLoading] = useState(false);
@@ -60,15 +67,10 @@ export function UpgradeModal({ isOpen, onClose }: Props) {
           </p>
 
           <div className="mt-6 space-y-4 text-left">
-            {[
-              "Unlimited image and file uploads",
-              "Access to advanced Gemini 2.5 models",
-              "Priority processing and faster responses",
-              "Early access to new experimental features",
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-[var(--color-accent)]" />
-                <span className="text-sm font-medium text-[var(--color-text)]">{feature}</span>
+            {FEATURES.map(({ icon, label }) => (
+              <div key={label} className="flex items-center gap-3">
+                <img src={icon} alt="" className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-medium text-[var(--color-text)]">{label}</span>
               </div>
             ))}
           </div>

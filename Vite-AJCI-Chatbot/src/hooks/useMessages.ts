@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { api } from "../lib/api";
-import type { Message, Session } from "../lib/types";
+import type { Attachment, Message, Session } from "../lib/types";
 
 function uid(prefix = "tmp"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;

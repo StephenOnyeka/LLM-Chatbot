@@ -13,6 +13,7 @@
     "typecheck": "tsc -p . --noEmit",
     "db:init": "psql \"$DATABASE_URL\" -f sql/001_init.sql",
     "db:migrate": "tsx src/migrate.ts",
+    "email:preview": "tsx src/scripts/previewEmails.ts",
     "worker": "tsx watch src/workers/aiWorker.ts",
     "worker:start": "node dist/workers/aiWorker.js"
   },
