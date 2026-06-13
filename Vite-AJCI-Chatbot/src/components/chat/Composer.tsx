@@ -1,31 +1,36 @@
-import { Plus, Send, X, File, FileText } from "lucide-react";
+import { Plus, X, File, FileText, Mic, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
 import type { Attachment } from "../../lib/types";
 import { Spinner } from "../ui/Spinner";
-import { TextArea } from "../ui/TextArea";
 import { UpgradeModal } from "../ui/UpgradeModal";
+import { cn } from "../../lib/cn";
 
 interface Props {
   onSend: (content: string, attachments?: Attachment[]) => void;
   disabled?: boolean;
+  /** When "landing" the composer renders with Gemini-style pill shape for the /chat home */
+  variant?: "landing" | "thread";
 }
 
-export function Composer({ onSend, disabled }: Props) {
+export function Composer({ onSend, disabled, variant = "thread" }: Props) {
   const { data: user } = useAuth();
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const [isSingleLine, setIsSingleLine] = useState(true);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-resize the textarea and track single-line state
   useEffect(() => {
-    const el = ref.current;
+    const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    setIsSingleLine(el.scrollHeight <= 50);
   }, [value]);
 
   function submit() {
@@ -72,7 +77,6 @@ export function Composer({ onSend, disabled }: Props) {
       alert("Failed to upload file.");
     } finally {
       setUploading(false);
-      // Reset input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -87,19 +91,31 @@ export function Composer({ onSend, disabled }: Props) {
     if (att.mimeType.startsWith("image/")) {
       return (
         <div className="h-full w-full overflow-hidden">
-          <img src={att.url} alt={att.name} className="h-full w-full object-cover" />
+          <img
+            src={att.url}
+            alt={att.name}
+            className="h-full w-full object-cover"
+          />
         </div>
       );
     }
-    if (att.mimeType.includes("pdf")) return <FileText className="h-5 w-5 text-red-400" />;
+    if (att.mimeType.includes("pdf"))
+      return <FileText className="h-5 w-5 text-red-400" />;
     return <File className="h-5 w-5 text-gray-400" />;
   }
 
   const hasContent = value.trim().length > 0 || attachments.length > 0;
+  const isLanding = variant === "landing";
 
   return (
-    <div className="border-t border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-4">
-      <div className="mx-auto max-w-3xl">
+    <div
+      className={cn(
+        isLanding
+          ? "w-full"
+          : "border-t border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-4",
+      )}
+    >
+      <div className={cn("mx-auto w-full", isLanding ? "" : "max-w-3xl")}>
         {/* Attachment Previews */}
         {attachments.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-3">
@@ -126,18 +142,30 @@ export function Composer({ onSend, disabled }: Props) {
           </div>
         )}
 
-        <div className="relative flex items-end gap-2">
-          {/* Plus icon / File upload button */}
-          <button
-            type="button"
-            onClick={handlePlusClick}
-            disabled={disabled || uploading || attachments.length >= 5}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-text-muted)] transition hover:bg-[var(--color-accent)]/15 hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Attach file"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-          
+        {/* Gemini-style pill input */}
+        <div
+          className={cn(
+            "flex flex-col",
+            isLanding
+              ? "rounded-3xl border border-white/10 bg-[#1e2230] shadow-lg"
+              : "rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface-2)]",
+          )}
+        >
+          {/* Text area — takes full width, sits on top */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Ask AJCI…"
+            disabled={disabled || uploading}
+            className={cn(
+              "min-h-[48px] w-full resize-none bg-transparent px-5 pb-1 pt-4 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none",
+              !hasContent && "text-center sm:text-left",
+            )}
+          />
+
           <input
             type="file"
             ref={fileInputRef}
@@ -147,34 +175,80 @@ export function Composer({ onSend, disabled }: Props) {
             accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           />
 
-          <div className="relative flex-1">
-            <TextArea
-              ref={ref}
-              rows={1}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={onKey}
-              placeholder="Send a message…"
-              className="pr-12"
-              disabled={disabled || uploading}
-            />
+          {/* Bottom bar: Plus on the left, Send on the right */}
+          <div className="flex items-center justify-between px-2 py-2">
+            {/* Plus / Attach button */}
             <button
               type="button"
-              onClick={submit}
-              disabled={disabled || !hasContent || uploading}
-              className="absolute right-2 bottom-2 flex h-8 w-8 items-center justify-center rounded-md bg-[var(--color-accent)] text-white transition hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Send message"
+              onClick={handlePlusClick}
+              disabled={disabled || uploading || attachments.length >= 5}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Attach file"
             >
-              {uploading ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+              <Plus className="h-5 w-5" />
             </button>
+
+            {/* Send button — visible only when there is content */}
+            {hasContent ? (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={disabled || uploading}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4285f4] text-white transition hover:bg-[#3b78e0] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Send message"
+              >
+                {uploading ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 19V5m0 0l-7 7m7-7l7 7"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            ) : (
+               <button
+                type="button"
+                onClick={submit}
+                disabled={disabled || uploading}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-600 text-white transition hover:bg-[#3b78e0] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Send message"
+              >
+                {uploading ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 19V5m0 0l-7 7m7-7l7 7"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         </div>
-        <p className="mt-2 text-center text-xs text-[var(--color-text-muted)]">
-          Press Enter to send · Shift + Enter for newline
-        </p>
+
+        {/* Helper text — only in thread mode */}
+        {!isLanding && (
+          <p className="mt-2 text-center text-xs text-[var(--color-text-muted)]">
+            Press Enter to send · Shift + Enter for newline
+          </p>
+        )}
       </div>
 
-      <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} />
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+      />
     </div>
   );
 }

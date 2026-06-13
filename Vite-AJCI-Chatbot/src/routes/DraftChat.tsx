@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PiOpenAiLogoFill } from "react-icons/pi";
 import { Composer } from "../components/chat/Composer";
+import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import type { Attachment, Message, Session } from "../lib/types";
 
@@ -14,35 +14,39 @@ export default function DraftChat() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const { data: user } = useAuth();
+
+  const firstName = user?.name?.split(" ")[0] || "there";
 
   async function onSend(content: string, attachments?: Attachment[]) {
     if (creating) return;
     setCreating(true);
     try {
       const session = await api.sessions.create();
-      // Seed caches so the new thread renders instantly without a refetch race:
-      // an empty message list, and the session at the top of history.
       qc.setQueryData<Message[]>(["messages", session.id], []);
-      qc.setQueryData<Session[]>(["sessions"], (prev) => [session, ...(prev ?? [])]);
-      // Hand the first message to the thread, which sends it on mount.
-      navigate(`/chat/${session.id}`, { state: { pending: content, pendingAttachments: attachments } });
+      qc.setQueryData<Session[]>(["sessions"], (prev) => [
+        session,
+        ...(prev ?? []),
+      ]);
+      navigate(`/chat/${session.id}`, {
+        state: { pending: content, pendingAttachments: attachments },
+      });
     } catch {
       setCreating(false);
     }
   }
 
   return (
-    <>
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
-          <PiOpenAiLogoFill className="h-6 w-6" />
-        </div>
-        <h2 className="mt-4 text-lg font-semibold">Start a conversation</h2>
-        <p className="mt-1 max-w-sm text-sm text-[var(--color-text-muted)]">
-          Type a message below to begin chatting with the assistant.
-        </p>
+    <div className="gemini-landing flex flex-1 flex-col items-center justify-end px-4 pb-8 sm:justify-center sm:pb-0">
+      {/* Greeting */}
+      <h1 className="mb-8 text-center text-2xl font-normal text-white/90 sm:text-3xl md:text-4xl">
+        What's the vibe, {firstName}?
+      </h1>
+
+      {/* Composer */}
+      <div className="w-full max-w-2xl">
+        <Composer onSend={onSend} disabled={creating} variant="landing" />
       </div>
-      <Composer onSend={onSend} disabled={creating} />
-    </>
+    </div>
   );
 }
