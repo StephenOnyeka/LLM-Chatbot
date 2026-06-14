@@ -1,5 +1,6 @@
 import { MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
+import { PiOpenAiLogoFill } from "react-icons/pi";
 
 interface Props {
   title: string;
@@ -13,8 +14,10 @@ export function AuthLayout({ title, subtitle, children, footer }: Props) {
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8 shadow-2xl shadow-black/40">
         <div className="mb-6 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
-            <MessageSquareText className="h-5 w-5" />
+          {/* <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]"> */}
+          {/* <div className="flex items-center justify-center rounded-lg text-[var(--color-accent)]"> */}
+          <div className="flex items-center justify-center rounded-lg text-white">
+            <PiOpenAiLogoFill className="h-7 w-7" />
           </div>
           <span className="text-sm font-semibold tracking-tight">AJCI Chat</span>
         </div>
