@@ -5,6 +5,7 @@ import { Outlet, useSearchParams } from "react-router-dom";
 import { Sidebar } from "../components/chat/Sidebar";
 import { api } from "../lib/api";
 import { useUIStore } from "../store/uiStore";
+import { PiOpenAiLogoFill } from "react-icons/pi";
 
 export default function ChatPage() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
@@ -60,8 +61,8 @@ export default function ChatPage() {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
-              <MessageSquareText className="h-4 w-4" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-accent)]">
+              <PiOpenAiLogoFill className="h-7 w-7" />
             </div>
             <span className="text-sm font-semibold tracking-tight">AJCI Chat</span>
           </div>

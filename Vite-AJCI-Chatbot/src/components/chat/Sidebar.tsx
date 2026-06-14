@@ -2,6 +2,7 @@ import { Crown, LogOut, MessageSquareText, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
 import { useAuth, useCancelPro, useLogout } from "../../hooks/useAuth";
+import { PiOpenAiLogoFill } from "react-icons/pi";
 import { useDeleteSession, useNewChat, useSessions } from "../../hooks/useSessions";
 import { useUIStore } from "../../store/uiStore";
 import { cn } from "../../lib/cn";
@@ -53,8 +54,9 @@ export function Sidebar() {
       )}
     >
       <div className="flex items-center gap-2 px-4 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
-          <MessageSquareText className="h-4 w-4" />
+        {/* <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]"> */}
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-accent)]">
+          <PiOpenAiLogoFill className="h-8 w-8" />
         </div>
         <span className="text-sm font-semibold tracking-tight">AJCI Chat</span>
       </div>
