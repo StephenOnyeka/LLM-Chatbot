@@ -210,7 +210,7 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
                 )}
               </button>
             ) : (
-               <button
+              <button
                 type="button"
                 onClick={submit}
                 disabled={disabled || uploading}

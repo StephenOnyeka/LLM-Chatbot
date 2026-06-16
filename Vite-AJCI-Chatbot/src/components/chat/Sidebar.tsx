@@ -3,7 +3,11 @@ import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
 import { useAuth, useCancelPro, useLogout } from "../../hooks/useAuth";
 import { PiOpenAiLogoFill } from "react-icons/pi";
-import { useDeleteSession, useNewChat, useSessions } from "../../hooks/useSessions";
+import {
+  useDeleteSession,
+  useNewChat,
+  useSessions,
+} from "../../hooks/useSessions";
 import { useUIStore } from "../../store/uiStore";
 import { cn } from "../../lib/cn";
 import { SessionItem } from "./SessionItem";
@@ -106,7 +110,9 @@ export function Sidebar() {
           <div className="rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-3">
             <div className="flex items-center gap-2">
               <Crown className="h-4 w-4 text-[var(--color-accent)]" />
-              <span className="text-sm font-semibold text-[var(--color-text)]">Pro plan</span>
+              <span className="text-sm font-semibold text-[var(--color-text)]">
+                Pro plan
+              </span>
             </div>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
               {renewsOn ? `Renews on ${renewsOn}` : "Active subscription"}
@@ -120,7 +126,11 @@ export function Sidebar() {
                 cancelPro.isPending && "opacity-70 pointer-events-none",
               )}
             >
-              {cancelPro.isPending ? <Spinner className="h-3.5 w-3.5" /> : "Cancel Pro"}
+              {cancelPro.isPending ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                "Cancel Pro"
+              )}
             </button>
           </div>
         </div>
@@ -133,7 +143,9 @@ export function Sidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{user?.name}</div>
-            <div className="truncate text-xs text-[var(--color-text-muted)]">{user?.email}</div>
+            <div className="truncate text-xs text-[var(--color-text-muted)]">
+              {user?.email}
+            </div>
           </div>
           <button
             type="button"

@@ -19,9 +19,12 @@ export default function ChatPage() {
     const sessionId = searchParams.get("session_id");
 
     if (success === "true" && sessionId) {
-      api.stripe.verifySession(sessionId)
+      api.stripe
+        .verifySession(sessionId)
         .then(() => {
-          alert("Payment successful! You are now a Pro member. You can upload images and files!");
+          alert(
+            "Payment successful! You are now a Pro member. You can upload images and files!",
+          );
           qc.invalidateQueries({ queryKey: ["auth", "me"] });
         })
         .catch((err) => {
@@ -64,7 +67,9 @@ export default function ChatPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-accent)]">
               <PiOpenAiLogoFill className="h-7 w-7" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">AJCI Chat</span>
+            <span className="text-sm font-semibold tracking-tight">
+              AJCI Chat
+            </span>
           </div>
         </div>
 

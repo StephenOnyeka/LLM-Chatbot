@@ -15,13 +15,19 @@ export function AuthLayout({ title, subtitle, children, footer }: Props) {
         <div className="mb-6 flex items-center gap-2">
           {/* <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent)]"> */}
           <div className="flex items-center justify-center rounded-lg text-[var(--color-accent)]">
-          {/* <div className="flex items-center justify-center rounded-lg text-white"> */}
+            {/* <div className="flex items-center justify-center rounded-lg text-white"> */}
             <PiOpenAiLogoFill className="h-7 w-7" />
           </div>
-          <span className="text-sm font-semibold tracking-tight">AJCI Chat</span>
+          <span className="text-sm font-semibold tracking-tight">
+            AJCI Chat
+          </span>
         </div>
-        <h1 className="text-xl font-semibold text-[var(--color-text)]">{title}</h1>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">{subtitle}</p>
+        <h1 className="text-xl font-semibold text-[var(--color-text)]">
+          {title}
+        </h1>
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+          {subtitle}
+        </p>
         <div className="mt-6">{children}</div>
         {footer && (
           <div className="mt-6 border-t border-[var(--color-border)] pt-4 text-center text-sm text-[var(--color-text-muted)]">
