@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PiOpenAiLogoFill } from "react-icons/pi";
 import { Composer } from "../components/chat/Composer";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";

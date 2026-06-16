@@ -1,4 +1,4 @@
-import { Crown, LogOut, MessageSquareText, Plus } from "lucide-react";
+import { Crown, LogOut, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
 import { useAuth, useCancelPro, useLogout } from "../../hooks/useAuth";

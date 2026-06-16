@@ -1,4 +1,3 @@
-import { MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
 import { PiOpenAiLogoFill } from "react-icons/pi";
 

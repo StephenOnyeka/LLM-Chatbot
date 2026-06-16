@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Menu, MessageSquareText } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useEffect } from "react";
 import { Outlet, useSearchParams } from "react-router-dom";
 import { Sidebar } from "../components/chat/Sidebar";

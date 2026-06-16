@@ -1,4 +1,4 @@
-import { Plus, X, File, FileText, Mic, ChevronDown } from "lucide-react";
+import { Plus, X, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../lib/api";
@@ -20,17 +20,15 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [isSingleLine, setIsSingleLine] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-resize the textarea and track single-line state
+  // Auto-resize the textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-    setIsSingleLine(el.scrollHeight <= 50);
   }, [value]);
 
   function submit() {
