@@ -5,9 +5,9 @@ into two separately deployed apps — `Vite-AJCI-Chatbot/` (frontend, Vercel) an
 `ajci-backend/` (backend, Render) — and they cache independently. There is **no
 shared cache** between them; they communicate only over the HTTP API.
 
-There are four caching layers in total: three on the backend (all in Redis) and
-one on the frontend (React Query). A fifth, static-asset caching, is handled by
-Vercel/Vite defaults and needs no project code.
+There are seven caching layers in total: five on the backend (four in Redis, one
+HTTP) and one on the frontend (React Query). A seventh, static-asset caching, is
+handled by Vercel/Vite defaults and needs no project code.
 
 ---
 
@@ -16,10 +16,12 @@ Vercel/Vite defaults and needs no project code.
 | # | Layer | Where | Store | Key | TTL | Invalidation |
 |---|-------|-------|-------|-----|-----|--------------|
 | 1 | LLM response cache | `ajci-backend/src/lib/responseCache.ts` | Redis | `resp:<sha256(userId, model, history)>` | 24h | TTL only |
-| 2 | Auth/user cache | `ajci-backend/src/repos/users.ts` | Redis | `user:<id>` | 5 min | TTL only (users never change) |
+| 2 | Auth/user cache | `ajci-backend/src/repos/users.ts` | Redis | `user:<id>` | 5 min | on password change + on Pro-status change |
 | 3 | History cache | `ajci-backend/src/repos/messages.ts` | Redis | `chat:history:<conversationId>` | 30 min | on append + on conversation delete |
-| 4 | Server-state cache | `Vite-AJCI-Chatbot/src/main.tsx` + hooks | React Query (memory) | `["messages", id]`, `["sessions"]` | `staleTime` 5 min / `gcTime` 30 min | `invalidateQueries` after send |
-| 5 | Static assets | `vercel.json` + Vite build | Vercel CDN | content-hashed filenames | immutable | new hash on rebuild |
+| 4 | Session-list cache | `ajci-backend/src/repos/conversations.ts` | Redis | `sessions:<userId>` | 5 min | on create / delete / rename / touch |
+| 5 | File bytes (HTTP) | `ajci-backend/src/routes/files.ts` | Browser / CDN | URL `+ ETag "<id>"` | 1 year (`immutable`) | none — ids are immutable |
+| 6 | Server-state cache | `Vite-AJCI-Chatbot/src/main.tsx` + hooks | React Query (memory) | `["messages", id]`, `["sessions"]` | `staleTime` 5 min / `gcTime` 30 min | `invalidateQueries` after send |
+| 7 | Static assets | `vercel.json` + Vite build | Vercel CDN | content-hashed filenames | immutable | new hash on rebuild |
 
 All Redis access goes through a single shared client from
 `ajci-backend/src/lib/redis.ts` (`getRedis()`). BullMQ uses its own separate
@@ -85,13 +87,15 @@ bug; raising the hit rate (e.g. normalized-prompt keys) is possible future work.
 **every authenticated request**, which was a Postgres round-trip per request.
 It's now cache-aside:
 
-- **Key:** `user:<id>`, value `JSON.stringify({ id, email, name })`.
+- **Key:** `user:<id>`, value `JSON.stringify({ id, email, name, isPro, ... })`.
 - **TTL:** `USER_CACHE_TTL_SEC = 300` (5 min).
 - **Positive-only:** a missing user is **not** cached (the value is always a
   `User`, never `null`), so a not-found result is never pinned.
-- **Invalidation:** none needed — users are only ever *created* in this codebase
-  (no update/delete path). **If a user update/delete path is ever added, it MUST
-  `DEL user:<id>`** (noted in a code comment).
+- **Invalidation (`DEL user:<id>`, best-effort):** every path that mutates a user
+  drops the key — `updateUserPassword` and `setUserProStatus` (Pro upgrade /
+  downgrade via Stripe). **Any future user update/delete path MUST `DEL
+  user:<id>` too**, or a stale identity (e.g. an out-of-date `isPro`) can be
+  served for up to the TTL.
 
 `middleware/auth.ts` was not changed — caching is internal to `findUserById`.
 
@@ -128,7 +132,58 @@ accepted trade-off.
 
 ---
 
-## 4. Frontend server-state cache (React Query)
+## 4. Session-list cache (Redis)
+
+**File:** `ajci-backend/src/repos/conversations.ts` (`listForUser` + invalidation
+helpers).
+
+`GET /api/sessions` (`routes/sessions.ts` → `listForUser`) renders the sidebar
+and runs on every app load. The query itself is already index-optimal
+(`conversations_user_updated_idx (user_id, updated_at desc)` matches
+`where user_id = $1 order by updated_at desc` exactly), so the cost is the
+Postgres round-trip, not the query. It's now cache-aside in Redis.
+
+- **Key:** `sessions:<userId>`, value is the full `Session[]` (newest-first).
+- **TTL:** `SESSIONS_CACHE_TTL_SEC = 300` (5 min) — a safety net against a missed
+  invalidation, not the primary correctness mechanism.
+- **Invalidation (`DEL sessions:<userId>`, best-effort):** every path that
+  changes the list drops the key — `createForUser`, `deleteOwned`, `rename`, and
+  `touch`. Because `rename`/`touch` operate by conversation id, they take
+  `userId` as an extra arg purely to build the invalidation key; the two callers
+  in `routes/chat.ts` pass `req.user!.id`.
+
+**Chat-path note:** `touch` fires on every chat turn (it bumps `updated_at`,
+which reorders the sidebar), so each message invalidates this key. That's
+intentional and cheap — the invalidation is a sub-ms `DEL`, and the cache still
+absorbs the hot path (app loads, navigation, reloads, extra tabs) without ever
+serving a stale or mis-ordered list.
+
+---
+
+## 5. File bytes — HTTP caching (browser / CDN)
+
+**File:** `ajci-backend/src/routes/files.ts`.
+
+`GET /api/files/:id` streams an uploaded file's bytes out of the `files` table
+(`data BYTEA`). Without cache headers, every image re-render / scroll-back /
+reload re-fetches the full blob from Postgres. This is **HTTP** caching (headers
+on the response), not Redis — the browser and any CDN stop re-requesting.
+
+- **Immutability is the whole basis:** a file id maps to bytes that can never
+  change (there is no update path for `files`), so the id *is* a sound content
+  identity.
+- **`ETag: "<id>"`** — set on every 200 response.
+- **`Cache-Control: public, max-age=31536000, immutable`** — cache for a year,
+  no revalidation. `public` is consistent with the route currently having **no
+  `requireAuth`** (files are public-by-unguessable-UUID). If files are ever made
+  per-user access-controlled, switch `public` → `private` at the same time.
+- **304 short-circuit:** if the request carries `If-None-Match: "<id>"`, the
+  route returns `304` **before** querying Postgres, so a revalidation costs a
+  string compare instead of a multi-MB BYTEA read.
+
+---
+
+## 6. Frontend server-state cache (React Query)
 
 **Files:** `Vite-AJCI-Chatbot/src/main.tsx`, hooks in
 `Vite-AJCI-Chatbot/src/hooks/`.
@@ -150,7 +205,7 @@ cross-instance).**
 
 ---
 
-## 5. Static assets (Vercel / Vite)
+## 7. Static assets (Vercel / Vite)
 
 `Vite-AJCI-Chatbot/vercel.json` is only an SPA rewrite (`/(.*) → /index.html`).
 Asset caching is Vite's content-hashed `dist/` filenames served immutably by
@@ -200,6 +255,12 @@ With the backend running and `REDIS_URL` reachable:
 - **History cache:** open a conversation's `/messages` → a
   `chat:history:<id>` key appears (TTL ≤ 1800s). Send a message → the key is
   deleted; read again → it repopulates. Delete the conversation → key gone.
+- **Session-list cache:** load the app → a `sessions:<userId>` key appears
+  (TTL ≤ 300s). Create/delete/rename a session, or send a message in any
+  conversation (`touch`) → the key is deleted; next sidebar load repopulates it.
+- **File HTTP cache:** request `/api/files/:id` → response has `ETag` and
+  `Cache-Control: …immutable`. Re-request with `If-None-Match: "<id>"` → `304`
+  with no body (and no DB read).
 - **LLM cache / isolation:** two different users send the *same* first message →
   two **separate** `resp:` keys (no collision).
 - **Fail-open:** point a backend instance at an unreachable `REDIS_URL`; all
