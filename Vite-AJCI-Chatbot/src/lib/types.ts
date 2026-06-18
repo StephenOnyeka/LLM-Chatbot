@@ -22,6 +22,7 @@ export interface Session {
 }
 
 export interface Attachment {
+  id: string;
   url: string;
   name: string;
   mimeType: string;

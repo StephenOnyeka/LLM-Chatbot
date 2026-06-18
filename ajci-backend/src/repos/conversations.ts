@@ -6,6 +6,21 @@ import type { Session } from "../types.js";
 // cascades to its messages in PG, so the cached history must be dropped too.
 const historyCacheKey = (conversationId: string) => `chat:history:${conversationId}`;
 
+// The per-user session list (sidebar) is read on every app load. It's cached
+// cache-aside in Redis and invalidated by every path that changes the list:
+// create, delete, rename, and touch (which reorders by updated_at). The TTL is
+// just a safety net against a missed invalidation. All Redis calls fail open.
+const SESSIONS_CACHE_TTL_SEC = 300; // 5 min
+const sessionsCacheKey = (userId: string) => `sessions:${userId}`;
+
+async function invalidateSessions(userId: string): Promise<void> {
+  try {
+    await getRedis().del(sessionsCacheKey(userId));
+  } catch {
+    // best-effort — a stale key still expires via TTL
+  }
+}
+
 interface Row {
   id: string;
   title: string;
@@ -23,6 +38,15 @@ function toSession(r: Row): Session {
 }
 
 export async function listForUser(userId: string): Promise<Session[]> {
+  const key = sessionsCacheKey(userId);
+
+  try {
+    const cached = await getRedis().get(key);
+    if (cached) return JSON.parse(cached) as Session[];
+  } catch {
+    // cache read failed — fall through to the DB
+  }
+
   const { rows } = await query<Row>(
     `select id, title, created_at, updated_at
      from conversations
@@ -30,7 +54,15 @@ export async function listForUser(userId: string): Promise<Session[]> {
      order by updated_at desc`,
     [userId],
   );
-  return rows.map(toSession);
+  const sessions = rows.map(toSession);
+
+  try {
+    await getRedis().set(key, JSON.stringify(sessions), "EX", SESSIONS_CACHE_TTL_SEC);
+  } catch {
+    // cache write is best-effort
+  }
+
+  return sessions;
 }
 
 export async function createForUser(userId: string, title = "New chat"): Promise<Session> {
@@ -40,6 +72,7 @@ export async function createForUser(userId: string, title = "New chat"): Promise
      returning id, title, created_at, updated_at`,
     [userId, title],
   );
+  await invalidateSessions(userId);
   return toSession(rows[0]!);
 }
 
@@ -50,6 +83,7 @@ export async function deleteOwned(id: string, userId: string): Promise<boolean> 
   );
   const deleted = (rowCount ?? 0) > 0;
   if (deleted) {
+    await invalidateSessions(userId);
     try {
       await getRedis().del(historyCacheKey(id));
     } catch {
@@ -70,13 +104,15 @@ export async function getOwned(id: string, userId: string): Promise<Session | nu
   return r ? toSession(r) : null;
 }
 
-export async function touch(id: string): Promise<void> {
+export async function touch(id: string, userId: string): Promise<void> {
   await query(`update conversations set updated_at = now() where id = $1`, [id]);
+  await invalidateSessions(userId);
 }
 
-export async function rename(id: string, title: string): Promise<void> {
+export async function rename(id: string, title: string, userId: string): Promise<void> {
   await query(`update conversations set title = $2, updated_at = now() where id = $1`, [
     id,
     title,
   ]);
+  await invalidateSessions(userId);
 }

@@ -20,10 +20,10 @@ const router = Router();
 router.use(requireAuth);
 
 const AttachmentSchema = z.object({
+  id: z.string(),
   url: z.string(),
   name: z.string(),
   mimeType: z.string(),
-  localPath: z.string(),
 });
 
 const ChatBody = z.object({
@@ -120,9 +120,9 @@ router.post(
           titleText = `File: ${attachments[0]?.name || "upload"}`;
         }
         const title = titleText.length > 60 ? `${titleText.slice(0, 60)}…` : (titleText || "New chat");
-        await rename(conversation.id, title);
+        await rename(conversation.id, title, req.user!.id);
       } else {
-        await touch(conversation.id);
+        await touch(conversation.id, req.user!.id);
       }
     } catch (err) {
       console.error("Failed to update conversation metadata:", err);

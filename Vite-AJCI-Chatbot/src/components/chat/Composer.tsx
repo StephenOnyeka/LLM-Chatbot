@@ -170,7 +170,7 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
             onChange={handleFileSelect}
             className="hidden"
             multiple
-            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain"
           />
 
           {/* Bottom bar: Plus on the left, Send on the right */}

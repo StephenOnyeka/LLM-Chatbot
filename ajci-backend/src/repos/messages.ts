@@ -1,8 +1,18 @@
-import { readFile } from "node:fs/promises";
 import { query } from "../db.js";
 import type { GeminiTurn } from "../lib/gemini.js";
 import { getRedis } from "../lib/redis.js";
 import type { Attachment, ChatRole, Message } from "../types.js";
+
+// MIME types Gemini accepts as inlineData. Anything the upload route allows
+// but isn't here (svg, doc/docx, xls/xlsx) must NOT be sent inline.
+const GEMINI_INLINE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+]);
 
 interface Row {
   id: string;
@@ -108,19 +118,33 @@ export async function listAsGeminiHistory(
   for (const m of slice) {
     const parts: GeminiTurn["parts"] = [];
 
-    // Include any file attachments as inlineData (base64) for the Gemini API.
+    // Include any file attachments for the Gemini API. Gemini's inlineData
+    // only accepts images, PDF, and plain text — sending any other type
+    // throws and bricks the whole conversation (it replays every turn). So
+    // only inline compatible types; reference the rest as a text note.
     if (m.attachments && m.attachments.length > 0) {
       for (const att of m.attachments) {
-        try {
-          const data = await readFile(att.localPath);
+        if (GEMINI_INLINE_MIME_TYPES.has(att.mimeType)) {
+          try {
+            const { rows } = await query<{ data: Buffer }>(
+              `select data from files where id = $1`,
+              [att.id],
+            );
+            if (rows[0]) {
+              parts.push({
+                inlineData: {
+                  mimeType: att.mimeType,
+                  data: rows[0].data.toString("base64"),
+                },
+              });
+            }
+          } catch {
+            // Row may have been deleted; skip gracefully
+          }
+        } else {
           parts.push({
-            inlineData: {
-              mimeType: att.mimeType,
-              data: data.toString("base64"),
-            },
+            text: `[Attached file: ${att.name} (${att.mimeType}) — content not directly readable by the model.]`,
           });
-        } catch {
-          // File may have been deleted; skip gracefully
         }
       }
     }

@@ -11,6 +11,7 @@ import chatRoutes from "./routes/chat.js";
 import sessionsRoutes from "./routes/sessions.js";
 import stripeRoutes from "./routes/stripe.js";
 import uploadRoutes from "./routes/upload.js";
+import filesRoutes from "./routes/files.js";
 import { resolve } from "node:path";
 
 export function createApp() {
@@ -38,10 +39,10 @@ export function createApp() {
       credentials: true,
     }),
   );
-  
+
   // Stripe webhook MUST be before express.json() so it gets the raw buffer
   app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
-  
+
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
   if (!isProd) app.use(morgan("dev"));
@@ -61,10 +62,9 @@ export function createApp() {
   app.use("/api/sessions", chatRoutes);
   app.use("/api/stripe", stripeRoutes);
   app.use("/api/upload", uploadRoutes);
-  
-  // Serve uploaded files statically under /api/uploads
-  app.use("/api/uploads", express.static(resolve(process.cwd(), env.UPLOAD_DIR)));
+  app.use("/api/files", filesRoutes);
 
+  // Removed static serving of uploads; files are now served from DB via /api/files/:id
   app.use(notFound);
   app.use(errorHandler);
 

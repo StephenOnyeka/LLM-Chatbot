@@ -1,10 +1,10 @@
 export type ChatRole = "user" | "assistant";
 
 export interface Attachment {
-  url: string;      // publicly accessible URL (e.g. /api/uploads/<filename>)
+  id: string;       // files table row id; used to fetch bytes for Gemini
+  url: string;      // publicly accessible URL (/api/files/<id>)
   name: string;     // original filename
   mimeType: string; // e.g. "image/png", "application/pdf"
-  localPath: string; // absolute disk path for Gemini inline reads
 }
 
 export interface User {
