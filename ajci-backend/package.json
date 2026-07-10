@@ -7,16 +7,15 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "nodemon --watch src --ext ts --exec \"tsx src/index.ts\"",
+    "dev": "nodemon --watch src --ext ts --exec \"tsx src/server.ts\"",
     "build": "tsc -p .",
-    "start": "node dist/index.js",
+    "start": "node dist/server.js",
     "typecheck": "tsc -p . --noEmit",
     "db:init": "psql \"$DATABASE_URL\" -f sql/001_init.sql",
     "db:migrate": "tsx src/migrate.ts",
     "email:preview": "tsx src/scripts/previewEmails.ts",
-    "worker": "tsx watch src/workers/aiWorker.ts",
-    "worker:start": "node dist/workers/aiWorker.js",
-    "dev2": "tsx watch src/index.ts"
+    "worker": "tsx watch src/jobs/aiWorker.ts",
+    "worker:start": "node dist/jobs/aiWorker.js"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",

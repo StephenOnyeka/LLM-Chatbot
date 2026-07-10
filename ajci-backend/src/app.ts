@@ -3,15 +3,15 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { env, isProd } from "./config.js";
-import { errorHandler, notFound } from "./middleware/error.js";
-import { rateLimit } from "./middleware/rateLimit.js";
-import authRoutes from "./routes/auth.js";
-import chatRoutes from "./routes/chat.js";
-import sessionsRoutes from "./routes/sessions.js";
-import stripeRoutes from "./routes/stripe.js";
-import uploadRoutes from "./routes/upload.js";
-import filesRoutes from "./routes/files.js";
+import { env, isProd } from "./config/env.js";
+import { errorHandler, notFound } from "./middlewares/error.middleware.js";
+import { rateLimit } from "./middlewares/rateLimit.middleware.js";
+import authRoutes from "./routes/auth.routes.js";
+import chatRoutes from "./routes/chat.routes.js";
+import sessionsRoutes from "./routes/sessions.routes.js";
+import stripeRoutes from "./routes/stripe.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
+import filesRoutes from "./routes/files.routes.js";
 import { resolve } from "node:path";
 
 export function createApp() {
