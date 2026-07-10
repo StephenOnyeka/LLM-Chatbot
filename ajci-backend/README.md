@@ -43,7 +43,19 @@ npm run dev      # tsx watch — restarts on file changes
 
 Server boots on `http://localhost:4000`. Health check: `GET /health`.
 
-## 5. API surface
+## 5. Architecture
+
+The application uses a standard layered architecture:
+- **`src/config/`**: Environment and database configuration.
+- **`src/middlewares/`**: Express middlewares (auth, rate limiting, error handling).
+- **`src/validators/`**: Zod schemas for validating request payloads.
+- **`src/controllers/`**: HTTP request handlers (parses `req`, sends `res`).
+- **`src/services/`**: Core business logic (orchestrates models, emails, external APIs).
+- **`src/repositories/`**: Database queries and direct data access.
+- **`src/utils/`**: Helper utilities (Redis, Gemini, mailer, JWT, etc.).
+- **`src/routes/`**: Route definitions mapping endpoints to controllers.
+
+## 6. API surface
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
@@ -59,7 +71,7 @@ Server boots on `http://localhost:4000`. Health check: `GET /health`.
 
 Auth is via the `ajci_token` httpOnly cookie. The frontend sends `credentials: 'include'`; nothing is stored in JS-accessible storage.
 
-## 6. Production build
+## 7. Production build
 
 ```bash
 npm run build
@@ -68,7 +80,7 @@ npm start
 
 `tsc` emits to `dist/`. Set `NODE_ENV=production` in the deployment environment so cookies pick up the `Secure` flag.
 
-## 7. Redis
+## 8. Redis
 
 Redis is used for three things, all of which fail open — if Redis is down the app keeps serving:
 
@@ -94,11 +106,11 @@ npm run worker
 
 The worker connects to the same `REDIS_URL` and consumes the `ai-jobs` queue. Currently it just logs received jobs — wire producers when you have heavy/async work to push off the request path.
 
-## 8. Pairing with the Vite frontend
+## 9. Pairing with the Vite frontend
 
 The frontend (`../Vite-AJCI-Chatbot`) proxies `/api → http://localhost:4000` in dev (see `vite.config.ts`), so cookies share the `localhost:5173` origin. To switch the frontend off the in-memory mock and onto this backend, replace the mock imports in `Vite-AJCI-Chatbot/src/lib/api/index.ts` with `fetch` calls through `client.ts` (see plan, Phase 3).
 
-## 9. Stripe & Pro Plan Integration
+## 10. Stripe & Pro Plan Integration
 
 To support file/image uploads, users must upgrade to the **Pro Plan** through Stripe checkout.
 
@@ -140,5 +152,5 @@ curl -X POST http://localhost:4000/api/stripe/cancel-subscription \
 ```
 
 To switch to end-of-period cancellation instead of immediate, see the commented
-one-line swap in `src/routes/stripe.ts` (`cancel_at_period_end: true`).
+one-line swap in `src/services/stripe.service.ts` (`cancel_at_period_end: true`).
 

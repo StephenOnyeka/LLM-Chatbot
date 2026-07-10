@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
-import { proCancelEmailHtml, proUpgradeEmailHtml } from "../lib/emailTemplates.js";
+import { proCancelEmailHtml, proUpgradeEmailHtml } from "../utils/emailTemplates.js";
 
 const SAMPLE_NAME = "Stephen";
 const SAMPLE_URL = "http://localhost:5173";
