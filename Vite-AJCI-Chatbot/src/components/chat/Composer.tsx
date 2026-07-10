@@ -6,6 +6,7 @@ import type { Attachment } from "../../lib/types";
 import { Spinner } from "../ui/Spinner";
 import { UpgradeModal } from "../ui/UpgradeModal";
 import { cn } from "../../lib/cn";
+import { useUIStore } from "../../store/uiStore";
 
 interface Props {
   onSend: (content: string, attachments?: Attachment[]) => void;
@@ -22,6 +23,7 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const showAlert = useUIStore((s) => s.showAlert);
 
   // Auto-resize the textarea
   useEffect(() => {
@@ -63,7 +65,7 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
       const newAttachments = [...attachments];
       for (const file of Array.from(files)) {
         if (newAttachments.length >= 5) {
-          alert("Maximum of 5 attachments allowed.");
+          showAlert("Maximum of 5 attachments allowed.");
           break;
         }
         const uploaded = await api.upload(file);
@@ -72,7 +74,7 @@ export function Composer({ onSend, disabled, variant = "thread" }: Props) {
       setAttachments(newAttachments);
     } catch (err) {
       console.error("Upload failed:", err);
-      alert("Failed to upload file.");
+      showAlert("Failed to upload file.", "Upload failed");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {

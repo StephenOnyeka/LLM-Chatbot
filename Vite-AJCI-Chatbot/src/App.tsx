@@ -35,6 +35,8 @@ export default function App() {
         onClose={closeAlert}
         title={alertConfig.title}
         message={alertConfig.message}
+        onConfirm={alertConfig.onConfirm}
+        confirmText={alertConfig.confirmText}
       />
     )}
     </>

@@ -33,17 +33,21 @@ export function Sidebar() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebar = useUIStore((s) => s.setSidebar);
   const showAlert = useUIStore((s) => s.showAlert);
+  const showConfirm = useUIStore((s) => s.showConfirm);
 
   function handleCancelPro() {
-    const confirmed = window.confirm(
+    showConfirm(
       "Cancel your Pro plan? You'll lose file & image uploads immediately and your account returns to the Free plan.",
-    );
-    if (!confirmed) return;
-    cancelPro.mutate(undefined, {
-      onError: () => {
-        showAlert("Failed to cancel your subscription. Please try again.", "Error");
+      () => {
+        cancelPro.mutate(undefined, {
+          onError: () => {
+            showAlert("Failed to cancel your subscription. Please try again.", "Error");
+          },
+        });
       },
-    });
+      "Cancel Pro plan?",
+      "Cancel plan",
+    );
   }
 
   const renewsOn = formatPlanDate(user?.proExpiresAt);
