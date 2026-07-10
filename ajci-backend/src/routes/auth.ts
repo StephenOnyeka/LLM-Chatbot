@@ -4,7 +4,7 @@ import { env } from "../config.js";
 import { clearAuthCookie, setAuthCookie } from "../lib/cookies.js";
 import { signToken } from "../lib/jwt.js";
 import { verifyGoogleIdToken } from "../lib/google.js";
-import { sendLoginCodeEmail, sendPasswordResetEmail } from "../lib/mailer.js";
+import { sendPasswordResetEmail } from "../lib/mailer.js";
 import { generateOtp, storeOtp, verifyOtp } from "../lib/otp.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
@@ -94,9 +94,9 @@ router.post(
   }),
 );
 
-// Step 1: verify the Google ID token, then email a 6-digit code instead of
-// logging in immediately. The verified email + name are stashed server-side
-// (in the OTP record) so step 2 can trust them without the client resending.
+// Google sign-in: verify the Google ID token, then immediately find-or-create
+// the user and log them in. Google already verified the user's identity so no
+// additional email OTP step is needed.
 router.post(
   "/google",
   authLimiter,
@@ -110,40 +110,7 @@ router.post(
       throw new HttpError(401, "Google sign-in failed. Please try again.");
     }
 
-    const code = generateOtp();
-    await storeOtp("login", profile.email, code, { name: profile.name });
-    try {
-      await sendLoginCodeEmail(profile.email, code);
-    } catch {
-      throw new HttpError(502, "Failed to send the sign-in code. Try again.");
-    }
-
-    // Return the email so the frontend knows which inbox to point the user at.
-    res.json({ email: profile.email });
-  }),
-);
-
-// Step 2: verify the emailed code, then find-or-create the user and log in.
-// Identity comes from the server-stashed OTP payload, never the request body.
-router.post(
-  "/google/verify",
-  authLimiter,
-  asyncHandler(async (req, res) => {
-    const body = GoogleVerifyBody.parse(req.body);
-
-    const { result, payload } = await verifyOtp("login", body.email, body.code);
-    if (result === "expired") {
-      throw new HttpError(400, "Code expired or not found. Start sign-in again.");
-    }
-    if (result === "locked") {
-      throw new HttpError(429, "Too many attempts. Start sign-in again.");
-    }
-    if (result === "invalid") {
-      throw new HttpError(400, "Invalid code.");
-    }
-
-    const name = payload?.name ?? body.email.split("@")[0]!;
-    const user = await findOrCreateGoogleUser(body.email, name);
+    const user = await findOrCreateGoogleUser(profile.email, profile.name);
     const token = signToken(user.id);
     setAuthCookie(res, token);
     res.json({ ...user, token });

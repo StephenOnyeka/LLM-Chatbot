@@ -7,7 +7,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "nodemon --watch src --ext ts --exec \"tsx src/index.ts\"",
     "build": "tsc -p .",
     "start": "node dist/index.js",
     "typecheck": "tsc -p . --noEmit",
@@ -15,7 +15,8 @@
     "db:migrate": "tsx src/migrate.ts",
     "email:preview": "tsx src/scripts/previewEmails.ts",
     "worker": "tsx watch src/workers/aiWorker.ts",
-    "worker:start": "node dist/workers/aiWorker.js"
+    "worker:start": "node dist/workers/aiWorker.js",
+    "dev2": "tsx watch src/index.ts"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
@@ -40,6 +41,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.1.1",
+    "nodemon": "^3.1.14",
     "pg": "^8.13.1",
     "resend": "^6.12.4",
     "stripe": "^22.2.0",

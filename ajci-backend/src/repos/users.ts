@@ -58,8 +58,8 @@ export async function findOrCreateGoogleUser(
   name: string,
 ): Promise<User> {
   const { rows } = await query<UserRow>(
-    `insert into users (email, name)
-     values ($1, $2)
+    `insert into users (email, name, password_hash)
+     values ($1, $2, null)
      on conflict (email) do update set email = excluded.email
      returning id, email, name, password_hash, is_pro, stripe_customer_id, stripe_subscription_id, pro_expires_at`,
     [email.toLowerCase(), name],
