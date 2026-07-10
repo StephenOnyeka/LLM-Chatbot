@@ -11,6 +11,7 @@ export default function ChatPage() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSidebar = useUIStore((s) => s.setSidebar);
+  const showAlert = useUIStore((s) => s.showAlert);
   const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
 
@@ -22,8 +23,9 @@ export default function ChatPage() {
       api.stripe
         .verifySession(sessionId)
         .then(() => {
-          alert(
+          showAlert(
             "Payment successful! You are now a Pro member. You can upload images and files!",
+            "Success"
           );
           qc.invalidateQueries({ queryKey: ["auth", "me"] });
         })

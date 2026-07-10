@@ -32,6 +32,7 @@ export function Sidebar() {
   const cancelPro = useCancelPro();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebar = useUIStore((s) => s.setSidebar);
+  const showAlert = useUIStore((s) => s.showAlert);
 
   function handleCancelPro() {
     const confirmed = window.confirm(
@@ -40,7 +41,7 @@ export function Sidebar() {
     if (!confirmed) return;
     cancelPro.mutate(undefined, {
       onError: () => {
-        alert("Failed to cancel your subscription. Please try again.");
+        showAlert("Failed to cancel your subscription. Please try again.", "Error");
       },
     });
   }

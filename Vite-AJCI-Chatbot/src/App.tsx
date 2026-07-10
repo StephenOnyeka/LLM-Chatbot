@@ -7,10 +7,16 @@ import GoogleVerifyPage from "./routes/GoogleVerifyPage";
 import LoginPage from "./routes/LoginPage";
 import RegisterPage from "./routes/RegisterPage";
 import RequireAuth from "./routes/RequireAuth";
+import { AlertModal } from "./components/ui/AlertModal";
+import { useUIStore } from "./store/uiStore";
 
 export default function App() {
+  const alertConfig = useUIStore((s) => s.alertConfig);
+  const closeAlert = useUIStore((s) => s.closeAlert);
+
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -23,5 +29,14 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/chat" replace />} />
     </Routes>
+    {alertConfig && (
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        onClose={closeAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+      />
+    )}
+    </>
   );
 }

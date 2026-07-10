@@ -18,17 +18,19 @@ const FEATURES: { icon: string; label: string }[] = [
 
 export function UpgradeModal({ isOpen, onClose }: Props) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   async function handleUpgrade() {
     try {
       setLoading(true);
+      setError(null);
       const { url } = await api.stripe.createCheckoutSession();
       window.location.href = url;
     } catch (err) {
       console.error("Checkout failed:", err);
-      alert("Failed to start checkout. Please try again.");
+      setError("Failed to start checkout. Please try again.");
       setLoading(false);
     }
   }
@@ -89,6 +91,11 @@ export function UpgradeModal({ isOpen, onClose }: Props) {
             <p className="mt-4 text-xs text-[var(--color-text-muted)]">
               Secure checkout provided by Stripe. Cancel anytime.
             </p>
+            {error && (
+              <p className="mt-2 text-sm text-[var(--color-danger)]">
+                {error}
+              </p>
+            )}
           </div>
         </div>
       </div>
