@@ -15,16 +15,16 @@ handled by Vercel/Vite defaults and needs no project code.
 
 | # | Layer | Where | Store | Key | TTL | Invalidation |
 |---|-------|-------|-------|-----|-----|--------------|
-| 1 | LLM response cache | `ajci-backend/src/lib/responseCache.ts` | Redis | `resp:<sha256(userId, model, history)>` | 24h | TTL only |
-| 2 | Auth/user cache | `ajci-backend/src/repos/users.ts` | Redis | `user:<id>` | 5 min | on password change + on Pro-status change |
-| 3 | History cache | `ajci-backend/src/repos/messages.ts` | Redis | `chat:history:<conversationId>` | 30 min | on append + on conversation delete |
-| 4 | Session-list cache | `ajci-backend/src/repos/conversations.ts` | Redis | `sessions:<userId>` | 5 min | on create / delete / rename / touch |
-| 5 | File bytes (HTTP) | `ajci-backend/src/routes/files.ts` | Browser / CDN | URL `+ ETag "<id>"` | 1 year (`immutable`) | none — ids are immutable |
-| 6 | Server-state cache | `Vite-AJCI-Chatbot/src/main.tsx` + hooks | React Query (memory) | `["messages", id]`, `["sessions"]` | `staleTime` 5 min / `gcTime` 30 min | `invalidateQueries` after send |
+| 1 | LLM response cache | `ajci-backend/src/utils/responseCache.ts` | Redis | `resp:<sha256(userId, model, history)>` | 24h | TTL only |
+| 2 | Auth/user cache | `ajci-backend/src/repositories/user.repository.ts` | Redis | `user:<id>` | 5 min | on password change + on Pro-status change |
+| 3 | History cache | `ajci-backend/src/repositories/message.repository.ts` | Redis | `chat:history:<conversationId>` | 30 min | on append + on conversation delete |
+| 4 | Session-list cache | `ajci-backend/src/repositories/conversation.repository.ts` | Redis | `sessions:<userId>` | 5 min | on create / delete / rename / touch |
+| 5 | File bytes (HTTP) | `ajci-backend/src/controllers/files.controller.ts` | Browser / CDN | URL `+ ETag "<id>"` | 1 year (`immutable`) | none — ids are immutable |
+| 6 | Server-state cache | `Vite-AJCI-Chatbot/src/main.tsx` + hooks | React Query (memory) | `["messages", id]`, `["sessions"]`, `["auth","me"]` | `staleTime` 5 min / `gcTime` 30 min | `invalidateQueries` after send |
 | 7 | Static assets | `vercel.json` + Vite build | Vercel CDN | content-hashed filenames | immutable | new hash on rebuild |
 
 All Redis access goes through a single shared client from
-`ajci-backend/src/lib/redis.ts` (`getRedis()`). BullMQ uses its own separate
+`ajci-backend/src/utils/redis.ts` (`getRedis()`). BullMQ uses its own separate
 connection via `bullmqConnectionOptions()`.
 
 ---
@@ -46,30 +46,34 @@ connection via `bullmqConnectionOptions()`.
 
 ## 1. LLM response cache (Redis)
 
-**Files:** `ajci-backend/src/lib/responseCache.ts`, wired into
-`ajci-backend/src/routes/chat.ts`.
+**Files:** `ajci-backend/src/utils/responseCache.ts`, wired into
+`ajci-backend/src/services/chat.service.ts` (lookup + populate) and replayed in
+`ajci-backend/src/controllers/chat.controller.ts` (SSE).
 
 Memoizes the model's reply so an identical prompt doesn't re-hit Gemini.
 
 - **Key:** `resp:<sha256>` where the hash is over a canonical JSON of
   `{ userId, model, history }` (`hashPromptKey`). The history is projected to
-  `{ role, parts:[{text}] }` so future additions to `GeminiTurn` don't
-  invalidate every existing key.
+  `{ role, parts:[{text}|{inlineData}] }` so future additions to `GeminiTurn`
+  don't invalidate every existing key.
 - **`userId` in the key is a privacy guarantee:** two different users who send
   an identical prompt get **separate** cache entries, so one user's reply can
-  never be replayed to another. (Verified live: identical prompts from two users
-  produce two distinct `resp:` keys.)
+  never be replayed to another.
 - **Determinism:** generation uses `temperature: 0`
-  (`ajci-backend/src/lib/gemini.ts`). This is what makes caching *sound* — a
+  (`ajci-backend/src/utils/gemini.ts`). This is what makes caching *sound* — a
   cached reply equals what the model would regenerate, instead of freezing one
   random sample for 24h.
 - **TTL:** `RESPONSE_CACHE_TTL_SEC = 86_400` (24h).
-- **Flow in `chat.ts`:**
-  - On a **hit**, the cached text is replayed through the same SSE protocol in
-    40-char chunks (`CACHE_REPLAY_CHUNK`) so the frontend can't tell it from a
-    live stream.
-  - On a **miss**, tokens stream live from Gemini and are assembled.
-  - The cache is populated **only** on a successful, non-aborted, non-empty live
+- **Flow:**
+  - `chat.service.ts#processChatRequest` computes `cacheKey` and reads
+    `getCachedReply(cacheKey)`.
+  - On a **hit**, `chat.controller.ts` replays the cached text through the same
+    SSE protocol in 40-char chunks (`CACHE_REPLAY_CHUNK`) so the frontend can't
+    tell it from a live stream.
+  - On a **miss**, tokens stream live from Gemini (`streamReply`) and are
+    assembled.
+  - `chat.service.ts#persistAssistantMessage` populates the cache
+    (`setCachedReply`) **only** on a successful, non-aborted, non-empty live
     generation — aborted/empty streams never poison it.
 
 **Known limitation:** the key is the full conversation history, so after turn 1
@@ -81,11 +85,11 @@ bug; raising the hit rate (e.g. normalized-prompt keys) is possible future work.
 
 ## 2. Auth / user cache (Redis)
 
-**File:** `ajci-backend/src/repos/users.ts` (`findUserById`).
+**File:** `ajci-backend/src/repositories/user.repository.ts` (`findUserById`).
 
-`requireAuth` (`ajci-backend/src/middleware/auth.ts`) calls `findUserById` on
-**every authenticated request**, which was a Postgres round-trip per request.
-It's now cache-aside:
+`requireAuth` (`ajci-backend/src/middlewares/auth.middleware.ts`) calls
+`findUserById` on **every authenticated request**, which was a Postgres
+round-trip per request. It's now cache-aside:
 
 - **Key:** `user:<id>`, value `JSON.stringify({ id, email, name, isPro, ... })`.
 - **TTL:** `USER_CACHE_TTL_SEC = 300` (5 min).
@@ -97,14 +101,15 @@ It's now cache-aside:
   user:<id>` too**, or a stale identity (e.g. an out-of-date `isPro`) can be
   served for up to the TTL.
 
-`middleware/auth.ts` was not changed — caching is internal to `findUserById`.
+`auth.middleware.ts` was not changed — caching is internal to `findUserById`.
 
 ---
 
 ## 3. Conversation history cache (Redis)
 
-**Files:** `ajci-backend/src/repos/messages.ts` (read + invalidate on append),
-`ajci-backend/src/repos/conversations.ts` (invalidate on delete).
+**Files:** `ajci-backend/src/repositories/message.repository.ts` (read +
+invalidate on append), `ajci-backend/src/repositories/conversation.repository.ts`
+(invalidate on delete).
 
 A conversation's full message list is read by the `/messages` endpoint and,
 sliced, on every chat turn. It's cached once as the single source of truth.
@@ -115,10 +120,10 @@ sliced, on every chat turn. It's cached once as the single source of truth.
 - **TTL:** `HISTORY_CACHE_TTL_SEC = 1800` (30 min).
 - **Single key, derived reads** (all go through the private `getCachedMessages`):
   - `listForConversation` → returns the cached list directly (used by
-    `GET /sessions/:id/messages` in `routes/sessions.ts`).
+    `GET /sessions/:id/messages` via `sessions.service.ts#getSessionMessages`).
   - `listAsGeminiHistory(limit)` → `slice(-limit)` of the cached list, mapped to
-    Gemini turns (`assistant → model`). Equivalent to the old
-    `order by created_at desc limit N` + reverse.
+    Gemini turns (`assistant → model`), inlining compatible attachments. The
+    default window is `GEMINI_HISTORY_LIMIT = 20` turns.
   - `countForConversation` → `messages.length` of the cached list.
 - **Invalidation (`DEL`, best-effort):**
   - `append` (new user or assistant message) deletes the key after insert.
@@ -134,14 +139,16 @@ accepted trade-off.
 
 ## 4. Session-list cache (Redis)
 
-**File:** `ajci-backend/src/repos/conversations.ts` (`listForUser` + invalidation
-helpers).
+**File:** `ajci-backend/src/repositories/conversation.repository.ts`
+(`listForUser` + invalidation helpers).
 
-`GET /api/sessions` (`routes/sessions.ts` → `listForUser`) renders the sidebar
-and runs on every app load. The query itself is already index-optimal
-(`conversations_user_updated_idx (user_id, updated_at desc)` matches
-`where user_id = $1 order by updated_at desc` exactly), so the cost is the
-Postgres round-trip, not the query. It's now cache-aside in Redis.
+`GET /api/sessions` (`routes/sessions.routes.ts` → `sessions.controller.ts` →
+`sessions.service.ts#getUserSessions` → `listForUser`) renders the sidebar and
+runs on every app load. The query itself is already index-optimal
+(`conversations_user_updated_idx (user_id, updated_at desc)` — see
+`sql/001_init.sql` — matches `where user_id = $1 order by updated_at desc`
+exactly), so the cost is the Postgres round-trip, not the query. It's now
+cache-aside in Redis.
 
 - **Key:** `sessions:<userId>`, value is the full `Session[]` (newest-first).
 - **TTL:** `SESSIONS_CACHE_TTL_SEC = 300` (5 min) — a safety net against a missed
@@ -149,8 +156,8 @@ Postgres round-trip, not the query. It's now cache-aside in Redis.
 - **Invalidation (`DEL sessions:<userId>`, best-effort):** every path that
   changes the list drops the key — `createForUser`, `deleteOwned`, `rename`, and
   `touch`. Because `rename`/`touch` operate by conversation id, they take
-  `userId` as an extra arg purely to build the invalidation key; the two callers
-  in `routes/chat.ts` pass `req.user!.id`.
+  `userId` as an extra arg purely to build the invalidation key; the callers in
+  `chat.service.ts#updateConversationMetadata` pass `req.user!.id`.
 
 **Chat-path note:** `touch` fires on every chat turn (it bumps `updated_at`,
 which reorders the sidebar), so each message invalidates this key. That's
@@ -162,9 +169,10 @@ serving a stale or mis-ordered list.
 
 ## 5. File bytes — HTTP caching (browser / CDN)
 
-**File:** `ajci-backend/src/routes/files.ts`.
+**File:** `ajci-backend/src/controllers/files.controller.ts`
+(route: `ajci-backend/src/routes/files.routes.ts`, `GET /api/files/:id`).
 
-`GET /api/files/:id` streams an uploaded file's bytes out of the `files` table
+The route streams an uploaded file's bytes out of the `files` table
 (`data BYTEA`). Without cache headers, every image re-render / scroll-back /
 reload re-fetches the full blob from Postgres. This is **HTTP** caching (headers
 on the response), not Redis — the browser and any CDN stop re-requesting.
@@ -186,19 +194,21 @@ on the response), not Redis — the browser and any CDN stop re-requesting.
 ## 6. Frontend server-state cache (React Query)
 
 **Files:** `Vite-AJCI-Chatbot/src/main.tsx`, hooks in
-`Vite-AJCI-Chatbot/src/hooks/`.
+`Vite-AJCI-Chatbot/src/hooks/` (`useAuth.ts`, `useSessions.ts`, `useMessages.ts`).
 
 React Query is the client-side ("L1") cache for data fetched from the API.
 
 - **Config (`main.tsx`):** `retry: false`, `refetchOnWindowFocus: false`,
   `staleTime: 5 min`, `gcTime: 30 min`. The `staleTime` stops the app from
   refetching `messages`/`sessions` on every component mount/navigation.
-- **Keys:** `["messages", sessionId]`, `["sessions"]`.
+- **Keys:** `["messages", sessionId]`, `["sessions"]`, `["auth","me"]`.
 - **Optimistic updates + invalidation (`hooks/useMessages.ts`):** sending a
-  message optimistically appends to `["messages", id]`, streams tokens into the
-  pending assistant message, then `invalidateQueries(["sessions"])` so the
-  sidebar/session list refreshes. Explicit invalidation still works regardless
-  of `staleTime`.
+  message optimistically appends a user message + an empty pending assistant
+  message to `["messages", id]`, streams tokens into the pending assistant
+  message, then `invalidateQueries(["sessions"])` so the sidebar/session list
+  refreshes. `hooks/useSessions.ts` and `hooks/useAuth.ts` similarly update the
+  cache in place (`setQueryData`) or invalidate on delete / login / logout /
+  cancel-pro. Explicit invalidation still works regardless of `staleTime`.
 
 Think of it as: **React Query = L1 (per-browser), Redis = L2 (server-side,
 cross-instance).**
@@ -215,7 +225,7 @@ Vercel's CDN. No project code required; a rebuild produces new hashes.
 
 ## Fail-open behavior (Redis down)
 
-**File:** `ajci-backend/src/lib/redis.ts` (`getRedis()`).
+**File:** `ajci-backend/src/utils/redis.ts` (`getRedis()`).
 
 The shared Redis client is configured to **fail fast** so a Redis outage doesn't
 hang requests:
@@ -226,10 +236,10 @@ hang requests:
 - `enableOfflineQueue: true` — tolerates brief reconnect blips.
 
 With these, when Redis is unreachable every cache call rejects in ~1s and falls
-through to Postgres. Verified live with an unreachable Redis: register, `/me`,
-session create, chat (SSE), and `/messages` all succeed in ~1–2s instead of the
-previous ~20s hang. The boot-time `pingRedis()` in `index.ts` is also fail-open
-("continuing in degraded mode").
+through to Postgres. Register, `/me`, session create, chat (SSE), and `/messages`
+all continue to succeed (degraded to DB) instead of hanging. The boot-time
+`pingRedis()` in `ajci-backend/src/server.ts` is also fail-open ("continuing in
+degraded mode").
 
 > BullMQ uses a **separate** connection (`bullmqConnectionOptions()` with
 > `maxRetriesPerRequest: null`); the fail-fast settings above apply only to the
@@ -239,10 +249,10 @@ previous ~20s hang. The boot-time `pingRedis()` in `index.ts` is also fail-open
 
 ## Related: rate limiting (Redis, not a cache)
 
-`ajci-backend/src/middleware/rateLimit.ts` also uses the shared Redis client
-(`INCR` + `EXPIRE … NX` in one `multi()`), keyed `rl:<bucket>:<ip>`. It's not a
-cache but shares the same fail-open guarantee (a Redis error calls `next()` and
-lets the request through).
+`ajci-backend/src/middlewares/rateLimit.middleware.ts` also uses the shared Redis
+client (`INCR` + `EXPIRE … NX` in one `multi()`), keyed `rl:<bucket>:<ip>`. It's
+not a cache but shares the same fail-open guarantee (a Redis error calls `next()`
+and lets the request through).
 
 ---
 
