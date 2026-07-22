@@ -12,6 +12,8 @@ import sessionsRoutes from "./routes/sessions.routes.js";
 import stripeRoutes from "./routes/stripe.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import filesRoutes from "./routes/files.routes.js";
+import swaggerUi from "swagger-ui-express";
+import { buildOpenApiSpec } from "./docs/openapi.js";
 import { resolve } from "node:path";
 
 export function createApp() {
@@ -50,6 +52,13 @@ export function createApp() {
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
   });
+
+  // API documentation. Spec is built once at startup from the zod validators.
+  const openApiSpec = buildOpenApiSpec();
+  app.get("/docs.json", (_req, res) => {
+    res.json(openApiSpec);
+  });
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
   // Global safety-net limiter; per-route limiters below are tighter.
   app.use(

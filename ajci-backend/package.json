@@ -14,10 +14,12 @@
     "db:init": "psql \"$DATABASE_URL\" -f sql/001_init.sql",
     "db:migrate": "tsx src/migrate.ts",
     "email:preview": "tsx src/scripts/previewEmails.ts",
+    "openapi:export": "tsx src/scripts/exportOpenApi.ts",
     "worker": "tsx watch src/jobs/aiWorker.ts",
     "worker:start": "node dist/jobs/aiWorker.js"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@google/genai": "^0.7.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.8",
@@ -44,11 +46,13 @@
     "pg": "^8.13.1",
     "resend": "^6.12.4",
     "stripe": "^22.2.0",
+    "swagger-ui-express": "^5.0.1",
     "typescript": "^5.7.2",
     "uuid": "^11.0.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.19.2"
   }
 }

@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(mkdir -p \"C:/Users/hp/Desktop/AJCI/ajci-backend/src/middleware\" \"C:/Users/hp/Desktop/AJCI/ajci-backend/src/lib\" \"C:/Users/hp/Desktop/AJCI/ajci-backend/src/routes\" \"C:/Users/hp/Desktop/AJCI/ajci-backend/src/repos\" \"C:/Users/hp/Desktop/AJCI/ajci-backend/sql\")",
-      "Read(//c/Users/hp/Desktop/AJCI/**)"
-    ]
-  }
-}
