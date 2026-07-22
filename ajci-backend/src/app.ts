@@ -47,7 +47,9 @@ export function createApp() {
 
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
-  if (!isProd) app.use(morgan("dev"));
+  // Skip HTTP request logging in prod (structured logs elsewhere) and in tests
+  // (keeps the vitest output readable).
+  if (!isProd && env.NODE_ENV !== "test") app.use(morgan("dev"));
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });

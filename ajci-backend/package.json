@@ -16,7 +16,10 @@
     "email:preview": "tsx src/scripts/previewEmails.ts",
     "openapi:export": "tsx src/scripts/exportOpenApi.ts",
     "worker": "tsx watch src/jobs/aiWorker.ts",
-    "worker:start": "node dist/jobs/aiWorker.js"
+    "worker:start": "node dist/jobs/aiWorker.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
@@ -52,7 +55,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/supertest": "^6.0.2",
     "@types/swagger-ui-express": "^4.1.8",
-    "tsx": "^4.19.2"
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
   }
 }

@@ -43,7 +43,26 @@ npm run dev      # tsx watch — restarts on file changes
 
 Server boots on `http://localhost:4000`. Health check: `GET /health`.
 
-## 5. Architecture
+## 5. Test
+
+API tests run with **Vitest** + **Supertest** against the real Express app
+(`createApp()`), so routing, Zod validation, auth middleware, and error handling
+are all exercised end-to-end. External boundaries — Postgres, Redis, Gemini,
+Stripe, Google, and email — are mocked at the module level, so the suite is fast
+and needs **no live infrastructure or real credentials** (`test/setup.env.ts`
+supplies dummy env vars before any module loads).
+
+```bash
+npm test            # run once
+npm run test:watch  # re-run on change
+npm run test:coverage
+```
+
+Coverage (`test/*.test.ts`): health/docs/CORS/404, auth (register, login,
+google, forgot/reset password, logout, me), sessions CRUD, chat SSE streaming
+(live + cached), file upload/serve, and Stripe checkout/verify/cancel/webhook.
+
+## 6. Architecture
 
 The application uses a standard layered architecture:
 - **`src/config/`**: Environment and database configuration.
@@ -55,7 +74,7 @@ The application uses a standard layered architecture:
 - **`src/utils/`**: Helper utilities (Redis, Gemini, mailer, JWT, etc.).
 - **`src/routes/`**: Route definitions mapping endpoints to controllers.
 
-## 6. API surface
+## 7. API surface
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
@@ -71,7 +90,7 @@ The application uses a standard layered architecture:
 
 Auth is via the `ajci_token` httpOnly cookie. The frontend sends `credentials: 'include'`; nothing is stored in JS-accessible storage.
 
-## 7. Production build
+## 8. Production build
 
 ```bash
 npm run build
@@ -80,7 +99,7 @@ npm start
 
 `tsc` emits to `dist/`. Set `NODE_ENV=production` in the deployment environment so cookies pick up the `Secure` flag.
 
-## 8. Redis
+## 9. Redis
 
 Redis is used for three things, all of which fail open — if Redis is down the app keeps serving:
 
@@ -106,11 +125,11 @@ npm run worker
 
 The worker connects to the same `REDIS_URL` and consumes the `ai-jobs` queue. Currently it just logs received jobs — wire producers when you have heavy/async work to push off the request path.
 
-## 9. Pairing with the Vite frontend
+## 10. Pairing with the Vite frontend
 
 The frontend (`../Vite-AJCI-Chatbot`) proxies `/api → http://localhost:4000` in dev (see `vite.config.ts`), so cookies share the `localhost:5173` origin. To switch the frontend off the in-memory mock and onto this backend, replace the mock imports in `Vite-AJCI-Chatbot/src/lib/api/index.ts` with `fetch` calls through `client.ts` (see plan, Phase 3).
 
-## 10. Stripe & Pro Plan Integration
+## 11. Stripe & Pro Plan Integration
 
 To support file/image uploads, users must upgrade to the **Pro Plan** through Stripe checkout.
 
