@@ -48,10 +48,17 @@ export async function chat(req: Request, res: Response) {
       writeSSEDone(res);
       res.end();
     }
-  } catch (err) {
-    console.error("Gemini stream failed:", err);
+  } catch (err: unknown) {
+    const errMsg =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : "stream failed";
+    // Log full detail so Render/server logs show the real Gemini error.
+    console.error("[chat] Gemini stream failed —", errMsg, err);
     if (!aborted && !res.writableEnded) {
-      writeSSEEvent(res, "error", { message: "stream failed" });
+      writeSSEEvent(res, "error", { message: errMsg });
       res.end();
     }
   }

@@ -30,7 +30,7 @@ const schema = z.object({
       ),
     ),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
-  GEMINI_MODEL: z.string(),
+  GEMINI_MODEL: z.string().min(1, "GEMINI_MODEL is required"),
   RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
   // Sandbox sender (onboarding@resend.dev) only delivers to the Resend account
   // owner's address. Swap for a verified-domain sender to email real users.

@@ -21,7 +21,15 @@ export async function* streamReply(history: GeminiTurn[]): AsyncIterable<string>
     config: { temperature: 0 },
   });
   for await (const chunk of response) {
-    const text = chunk.text;
+    let text: string | undefined;
+    try {
+      // chunk.text is a getter that can throw on safety-blocked or
+      // non-text chunks (function calls, finish reasons, etc.).
+      text = chunk.text;
+    } catch {
+      // Skip this chunk — it carries no text content.
+      continue;
+    }
     if (typeof text === "string" && text.length > 0) {
       yield text;
     }
